@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Logo } from "@/components/ui/Logo";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { CopyGuard } from "@/components/CopyGuard";
+import { NewContactForm } from "@/components/NewContactForm";
 import { formatTime } from "@/lib/format";
 import type { ChatDetail, ChatRow as ChatSummary } from "@/types/admin";
 
@@ -93,6 +94,13 @@ export default function AgentPage() {
             <LogOut size={15} />
           </button>
         </div>
+
+        <NewContactForm
+          onCreated={(chat) => {
+            setChats((prev) => [chat, ...prev.filter((c) => c.id !== chat.id)]);
+            setActiveId(chat.id);
+          }}
+        />
 
         {chats.length === 0 && (
           <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>

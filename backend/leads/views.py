@@ -73,9 +73,9 @@ class ChatViewSet(viewsets.ModelViewSet):
         chat.save(update_fields=["assigned_user", "status"])
         return Response(ChatSerializer(chat).data)
 
-    @action(detail=False, methods=["post"], permission_classes=[permissions.IsAuthenticated, IsAdmin])
+    @action(detail=False, methods=["post"])
     def start(self, request):
-        """Admin-only: add a new contact and open its chat."""
+        """Admin/TL/agent: add a new contact and start (or claim) its chat."""
         phone_number = (request.data.get("phone_number") or "").strip()
         if not phone_number:
             return Response({"detail": "phone_number is required."}, status=400)
