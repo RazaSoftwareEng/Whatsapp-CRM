@@ -58,13 +58,13 @@ docker network create proxy_network
 
 ```bash
 cd ~/whatsapp-crm
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker/docker-compose.prod.yml up -d --build
 ```
 
 Check all containers are running:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker/docker-compose.prod.yml ps
 ```
 
 Expected output:
@@ -263,7 +263,7 @@ curl -I https://crm.yourdomain.com/api/auth/login/
 # Should return HTTP 200 or 405 (Method Not Allowed for GET) — both mean Django is running
 
 # Check all CRM containers
-docker compose -f ~/whatsapp-crm/docker-compose.prod.yml ps
+docker compose -f ~/whatsapp-crm/docker/docker-compose.prod.yml ps
 
 # Check logs
 docker logs whatsapp_crm_web --tail 30
@@ -276,13 +276,13 @@ docker logs whatsapp_crm_celery_worker --tail 20
 
 ```bash
 # Restart all CRM services
-docker compose -f ~/whatsapp-crm/docker-compose.prod.yml restart
+docker compose -f ~/whatsapp-crm/docker/docker-compose.prod.yml restart
 
 # Stop all CRM services (does NOT delete data)
-docker compose -f ~/whatsapp-crm/docker-compose.prod.yml down
+docker compose -f ~/whatsapp-crm/docker/docker-compose.prod.yml down
 
 # View live logs
-docker compose -f ~/whatsapp-crm/docker-compose.prod.yml logs -f
+docker compose -f ~/whatsapp-crm/docker/docker-compose.prod.yml logs -f
 
 # Run Django management command
 docker exec -it whatsapp_crm_web python manage.py <command>
@@ -290,10 +290,15 @@ docker exec -it whatsapp_crm_web python manage.py <command>
 # Open PostgreSQL shell
 docker exec -it whatsapp_crm_db psql -U $DB_USER -d $DB_NAME
 
-# Pull latest code and redeploy
+# Pull latest code and redeploy (handles build, migrate, restart and verify)
 cd ~/whatsapp-crm
-git pull origin main
-docker compose -f docker-compose.prod.yml up -d --build
+./ops/deploy.sh
+
+# Roll back if the deploy went wrong
+./ops/rollback.sh
+
+# Restart without changing code
+./ops/restart.sh
 ```
 
 ---

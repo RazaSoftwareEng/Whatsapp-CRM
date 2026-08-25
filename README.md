@@ -136,15 +136,24 @@ whatsapp-crm/
 │   │   ├── context/           # Auth context (JWT state)
 │   │   └── lib/               # API client, token storage, formatters
 │   └── package.json
-├── scripts/
+├── ops/
 │   ├── setup_vps.sh           # One-time VPS initialisation
 │   ├── deploy.sh              # Production deployment
-│   ├── health_check.sh        # Service health monitoring
+│   ├── rollback.sh            # Roll back to an earlier commit
+│   ├── restart.sh             # Restart the stack (no code change)
+│   ├── migrate.sh             # Run / inspect Django migrations
+│   ├── status.sh              # Instant status overview
+│   ├── health.sh              # Deep health checks
+│   ├── monitor.sh             # Live resource monitor
+│   ├── logs.sh                # Log viewer
 │   ├── backup.sh              # PostgreSQL backup
 │   ├── restore.sh             # PostgreSQL restore
-│   └── logs.sh                # Log viewer
-├── docker-compose.prod.yml    # Production stack
-├── .env.production.template   # Production env template
+│   ├── ssl-renew.sh           # Let's Encrypt renewal + Nginx reload
+│   ├── secrets-check.sh       # Audit .env.production
+│   └── cleanup.sh             # Reclaim disk space
+├── docker/
+│   ├── docker-compose.prod.yml    # Production stack
+│   └── docker-compose.dev.yml     # Local development stack
 └── VPS_SETUP_GUIDE.md         # Step-by-step VPS deployment guide
 ```
 
@@ -273,13 +282,14 @@ Quick summary:
 
 ```bash
 # 1. On VPS — one-time setup
-sudo ./scripts/setup_vps.sh
+sudo ./ops/setup_vps.sh
 
-# 2. Configure environment
+# 2. Configure environment, then verify it
 nano .env.production
+./ops/secrets-check.sh
 
 # 3. Start all services
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d --build
 
 # 4. Create superuser
 docker exec -it whatsapp_crm_web python manage.py createsuperuser
@@ -288,24 +298,44 @@ docker exec -it whatsapp_crm_web python manage.py createsuperuser
 docker network connect proxy_network inventory_portal-nginx-1
 ```
 
+### Redeploying after a code change
+
+```bash
+cd ~/whatsapp-crm
+./ops/deploy.sh          # pull, rebuild backend + frontend, migrate, restart, verify
+./ops/health.sh          # confirm
+```
+
+If something is wrong: `./ops/rollback.sh`
+
 ---
 
 ## Scripts
 
-All scripts are in the `scripts/` directory. Make them executable first:
+All scripts live in the `ops/` directory. Make them executable first:
 
 ```bash
-chmod +x scripts/*.sh
+chmod +x ops/*.sh
 ```
+
+Every script supports `--help`.
 
 | Script | Usage | Description |
 |---|---|---|
-| `setup_vps.sh` | `sudo ./scripts/setup_vps.sh` | One-time VPS setup |
-| `deploy.sh` | `./scripts/deploy.sh` | Deploy latest code |
-| `health_check.sh` | `./scripts/health_check.sh --domain crm.yourdomain.com` | Check all services |
-| `backup.sh` | `./scripts/backup.sh` | Backup PostgreSQL |
-| `restore.sh` | `./scripts/restore.sh --file backups/backup_XXX.sql.gz` | Restore database |
-| `logs.sh` | `./scripts/logs.sh web --follow` | View/stream logs |
+| `setup_vps.sh` | `sudo ./ops/setup_vps.sh` | One-time VPS setup (Docker, network, crons) |
+| `deploy.sh` | `./ops/deploy.sh` | Pull, build, migrate, restart, verify |
+| `rollback.sh` | `./ops/rollback.sh --to a1b2c3d` | Roll code back to an earlier commit |
+| `restart.sh` | `./ops/restart.sh --app` | Restart services without changing code |
+| `migrate.sh` | `./ops/migrate.sh --plan` | Run or inspect Django migrations |
+| `status.sh` | `./ops/status.sh` | Instant status overview (no network calls) |
+| `health.sh` | `./ops/health.sh --domain api.qomunix.com` | Deep checks: DB, Redis, API, SSL, disk |
+| `monitor.sh` | `./ops/monitor.sh --interval 2` | Live CPU/memory/queue monitor |
+| `logs.sh` | `./ops/logs.sh web --follow` | View/stream logs |
+| `backup.sh` | `./ops/backup.sh` | Backup PostgreSQL |
+| `restore.sh` | `./ops/restore.sh --file backups/backup_XXX.sql.gz` | Restore database |
+| `ssl-renew.sh` | `./ops/ssl-renew.sh --check` | Renew certificates, reload Nginx |
+| `secrets-check.sh` | `./ops/secrets-check.sh` | Audit `.env.production` for misconfigurations |
+| `cleanup.sh` | `./ops/cleanup.sh --dry-run` | Reclaim disk space |
 
 ---
 

@@ -6,8 +6,8 @@
 # It installs Docker, creates the shared network, and sets script permissions.
 #
 # Usage:
-#   chmod +x scripts/setup_vps.sh
-#   sudo ./scripts/setup_vps.sh
+#   chmod +x ops/setup_vps.sh
+#   sudo ./ops/setup_vps.sh
 # =============================================================================
 set -e
 
@@ -25,7 +25,7 @@ warn()    { echo -e "${YELLOW}[!]${NC} $1"; }
 error()   { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
 # --- Must be root ------------------------------------------------------------
-[ "$EUID" -ne 0 ] && error "Please run as root: sudo ./scripts/setup_vps.sh"
+[ "$EUID" -ne 0 ] && error "Please run as root: sudo ./ops/setup_vps.sh"
 
 echo ""
 echo "========================================"
@@ -87,17 +87,27 @@ success "Backups dir: $APP_DIR/backups"
 
 # --- 6. Make all scripts executable ------------------------------------------
 log "Setting script permissions..."
-chmod +x "$APP_DIR/scripts/"*.sh
+chmod +x "$APP_DIR/ops/"*.sh
 chmod +x "$APP_DIR/backend/entrypoint.sh"
 success "All scripts are executable"
 
 # --- 7. Check .env.production ------------------------------------------------
 if [ ! -f "$APP_DIR/.env.production" ]; then
     warn ".env.production not found!"
-    log "Creating from template..."
-    cp "$APP_DIR/.env.production.template" "$APP_DIR/.env.production"
-    chmod 600 "$APP_DIR/.env.production"
-    warn "Edit .env.production now: nano $APP_DIR/.env.production"
+    if [ -f "$APP_DIR/.env.production.template" ]; then
+        log "Creating from template..."
+        cp "$APP_DIR/.env.production.template" "$APP_DIR/.env.production"
+        chmod 600 "$APP_DIR/.env.production"
+        warn "Edit .env.production now: nano $APP_DIR/.env.production"
+    else
+        warn "No .env.production.template in the repo either — create the file by hand."
+        warn "Required keys: SECRET_KEY DEBUG ALLOWED_HOSTS DB_ENGINE DB_NAME DB_USER"
+        warn "               DB_PASSWORD DB_HOST DB_PORT CORS_ALLOWED_ORIGINS"
+        warn "               CSRF_TRUSTED_ORIGINS FRONTEND_URL REDIS_URL"
+        warn "               WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID WHATSAPP_VERIFY_TOKEN"
+        warn "               EMAIL_BACKEND EMAIL_HOST EMAIL_HOST_USER EMAIL_HOST_PASSWORD"
+        warn "Then verify it with: $APP_DIR/ops/secrets-check.sh"
+    fi
 else
     success ".env.production found"
     chmod 600 "$APP_DIR/.env.production"
@@ -105,9 +115,20 @@ fi
 
 # --- 8. Setup daily backup cron ----------------------------------------------
 log "Setting up daily database backup cron..."
-CRON_JOB="0 2 * * * $APP_DIR/scripts/backup.sh >> /var/log/crm_backup.log 2>&1"
-( crontab -l 2>/dev/null | grep -v "backup.sh" ; echo "$CRON_JOB" ) | crontab -
+CRON_BACKUP="0 2 * * * $APP_DIR/ops/backup.sh >> /var/log/crm_backup.log 2>&1"
+CRON_SSL="0 0,12 * * * $APP_DIR/ops/ssl-renew.sh >> /var/log/crm_ssl.log 2>&1"
+CRON_CLEAN="0 3 * * 0 $APP_DIR/ops/cleanup.sh --yes >> /var/log/crm_cleanup.log 2>&1"
+
+( crontab -l 2>/dev/null \
+    | grep -v "ops/backup.sh" \
+    | grep -v "ops/ssl-renew.sh" \
+    | grep -v "ops/cleanup.sh" \
+    | grep -v "scripts/backup.sh" ; \
+  echo "$CRON_BACKUP" ; echo "$CRON_SSL" ; echo "$CRON_CLEAN" ) | crontab -
+
 success "Daily backup scheduled at 2:00 AM"
+success "SSL renewal checked at 00:00 and 12:00"
+success "Weekly disk cleanup scheduled Sunday 3:00 AM"
 
 # --- Done --------------------------------------------------------------------
 echo ""
@@ -119,5 +140,5 @@ echo "  Next steps:"
 echo "  1. Edit your env file    : nano $APP_DIR/.env.production"
 echo "  2. Start CRM services    : docker compose -f $APP_DIR/docker/docker-compose.prod.yml up -d --build"
 echo "  3. Connect to nginx      : docker network connect proxy_network inventory_portal-nginx-1"
-echo "  4. Check health          : $APP_DIR/scripts/health_check.sh"
+echo "  4. Check health          : $APP_DIR/ops/health.sh"
 echo ""

@@ -61,3 +61,9 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# =============================================================================
+# Ops runtime state — written on the VPS, must not be committed
+# =============================================================================
+ops/.deploy_history
+backups/

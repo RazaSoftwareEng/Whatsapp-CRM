@@ -3,12 +3,12 @@
 # logs.sh — View logs for any CRM service
 #
 # Usage:
-#   ./scripts/logs.sh                    # all services (last 50 lines each)
-#   ./scripts/logs.sh web                # only web (Gunicorn)
-#   ./scripts/logs.sh celery_worker      # only celery worker
-#   ./scripts/logs.sh db                 # only postgres
-#   ./scripts/logs.sh web --follow       # stream live logs
-#   ./scripts/logs.sh web --lines 100    # last 100 lines
+#   ./ops/logs.sh                    # all services (last 50 lines each)
+#   ./ops/logs.sh web                # only web (Gunicorn)
+#   ./ops/logs.sh celery_worker      # only celery worker
+#   ./ops/logs.sh db                 # only postgres
+#   ./ops/logs.sh web --follow       # stream live logs
+#   ./ops/logs.sh web --lines 100    # last 100 lines
 # =============================================================================
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

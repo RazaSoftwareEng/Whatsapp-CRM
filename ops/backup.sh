@@ -3,14 +3,14 @@
 # backup.sh — PostgreSQL database backup
 #
 # Usage:
-#   ./scripts/backup.sh                    # backup to default location
-#   ./scripts/backup.sh --dir /mnt/backups # backup to custom directory
-#   ./scripts/backup.sh --keep 7           # keep last 7 backups (default: 7)
+#   ./ops/backup.sh                    # backup to default location
+#   ./ops/backup.sh --dir /mnt/backups # backup to custom directory
+#   ./ops/backup.sh --keep 7           # keep last 7 backups (default: 7)
 #
 # Backup file format: backup_YYYY-MM-DD_HH-MM-SS.sql.gz
 #
 # Recommended: add to crontab for daily automatic backups
-#   0 2 * * * /root/whatsapp-crm/scripts/backup.sh >> /var/log/crm_backup.log 2>&1
+#   0 2 * * * /root/whatsapp-crm/ops/backup.sh >> /var/log/crm_backup.log 2>&1
 # =============================================================================
 set -e
 

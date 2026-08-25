@@ -3,7 +3,7 @@
 # restore.sh — Restore PostgreSQL database from a backup file
 #
 # Usage:
-#   ./scripts/restore.sh --file backups/backup_2025-08-20_02-00-00.sql.gz
+#   ./ops/restore.sh --file backups/backup_2025-08-20_02-00-00.sql.gz
 #
 # WARNING: This DROPS and recreates the database. All current data will be lost.
 #          Run backup.sh first if you want to save the current state.
@@ -36,7 +36,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-[ -z "$BACKUP_FILE" ] && error "Usage: ./scripts/restore.sh --file <backup_file.sql.gz>"
+[ -z "$BACKUP_FILE" ] && error "Usage: ./ops/restore.sh --file <backup_file.sql.gz>"
 [ ! -f "$BACKUP_FILE" ] && error "Backup file not found: $BACKUP_FILE"
 
 # --- Load env vars -----------------------------------------------------------
