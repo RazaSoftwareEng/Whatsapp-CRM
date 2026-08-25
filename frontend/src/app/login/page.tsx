@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type SubmitEvent } from "react";
-import { Lock, LogIn, User } from "lucide-react";
+import { LogIn, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/ui/Logo";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -90,23 +91,17 @@ export default function LoginPage() {
         <label className="mb-1.5 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>
           Password
         </label>
-        <div className="relative mb-4">
-          <Lock
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--text-faint)" }}
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            className="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-[var(--teal)]"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
-            autoComplete="current-password"
-            required
-          />
-        </div>
+        <PasswordInput
+          icon
+          className="mb-4"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Enter your password"
+          inputClassName="w-full rounded-lg border py-2.5 pl-9 pr-3 text-sm outline-none transition-colors focus:border-[var(--teal)]"
+          inputStyle={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+          autoComplete="current-password"
+          required
+        />
 
         <label className="mb-7 flex cursor-pointer items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
           <input

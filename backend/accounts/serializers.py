@@ -32,7 +32,8 @@ class AgentCreateSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    """Admin-only: create a user of any role (admin, team lead, or agent)."""
+    """Admin-only: create a user of any role except company_user (that login is only
+    ever auto-created via companies.services.ensure_company_user)."""
 
     password = serializers.CharField(write_only=True)
     team_lead = serializers.PrimaryKeyRelatedField(
@@ -42,6 +43,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "password", "role", "phone_number", "team_lead"]
+
+    def validate_role(self, value):
+        if value == User.Role.COMPANY_USER:
+            raise serializers.ValidationError("Company user accounts are created automatically, not manually.")
+        return value
 
     def create(self, validated_data):
         password = validated_data.pop("password")

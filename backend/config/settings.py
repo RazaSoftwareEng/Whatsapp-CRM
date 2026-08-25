@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'accounts',
     'leads',
     'webhooks',
+    'companies',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -185,6 +186,21 @@ CORS_ALLOWED_ORIGINS = config(
 WHATSAPP_TOKEN = config("WHATSAPP_TOKEN", default="")
 WHATSAPP_PHONE_NUMBER_ID = config("WHATSAPP_PHONE_NUMBER_ID", default="")
 WHATSAPP_VERIFY_TOKEN = config("WHATSAPP_VERIFY_TOKEN", default="")
+
+
+# Email — console backend prints to the runserver console for local dev.
+# Swap EMAIL_BACKEND to smtp + fill EMAIL_HOST* once real SMTP creds exist — no code changes needed.
+
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@example.com")
+
+# Frontend base URL — used to build invite / setup-password links in outgoing emails
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 
 
 # Celery — async task queue (broker: Redis, results: Redis)

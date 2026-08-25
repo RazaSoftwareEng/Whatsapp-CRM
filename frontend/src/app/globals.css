@@ -23,6 +23,8 @@
   --warning-soft: #fdf1e2;
   --danger: #dc2626;
   --danger-soft: #fce8e7;
+  --orange: #c2410c;
+  --orange-soft: #fdead9;
 
   --shadow-sm: 0 1px 2px rgba(20, 23, 31, 0.05);
   --shadow-md: 0 4px 16px rgba(20, 23, 31, 0.08);

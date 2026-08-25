@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type SubmitEvent } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { UserRow } from "@/types/admin";
 
@@ -124,13 +125,13 @@ export default function AgentsPage() {
             className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
             style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
           />
-          <input
-            placeholder="Password"
-            type="password"
+          <PasswordInput
+            className="mb-2"
             value={newAgent.password}
             onChange={(e) => setNewAgent({ ...newAgent, password: e.target.value })}
-            className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+            placeholder="Password"
+            inputClassName="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
+            inputStyle={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
             required
           />
           <select

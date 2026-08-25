@@ -4,14 +4,23 @@ import { useCallback, useEffect, useState, type SubmitEvent } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { Role, UserRow } from "@/types/admin";
 
-const ROLE_LABELS: Record<Role, string> = { admin: "Admin", tl: "Team Lead", agent: "Agent" };
+const ROLE_LABELS: Record<Role, string> = {
+  admin: "Admin",
+  tl: "Team Lead",
+  agent: "Agent",
+  manager: "Manager",
+  company_user: "Company User",
+};
 const ROLE_STYLES: Record<Role, { color: string; background: string }> = {
   admin: { color: "var(--indigo)", background: "var(--indigo-soft)" },
   tl: { color: "var(--warning)", background: "var(--warning-soft)" },
   agent: { color: "var(--teal-strong)", background: "var(--teal-soft)" },
+  manager: { color: "var(--orange)", background: "var(--orange-soft)" },
+  company_user: { color: "var(--text-muted)", background: "var(--surface-2)" },
 };
 
 function RoleBadge({ role }: { role: Role }) {
@@ -142,6 +151,7 @@ export default function UsersPage() {
           >
             <option value="agent">Agent</option>
             <option value="tl">Team Lead</option>
+            <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
 
@@ -182,13 +192,13 @@ export default function UsersPage() {
             className="mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
             style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
           />
-          <input
-            placeholder="Password"
-            type="password"
+          <PasswordInput
+            className="mb-3"
             value={newUser.password}
             onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-            className="mb-3 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+            placeholder="Password"
+            inputClassName="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--indigo)]"
+            inputStyle={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
             required
           />
 

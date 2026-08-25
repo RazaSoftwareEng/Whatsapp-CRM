@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { tokenStorage } from "@/lib/tokenStorage";
 
-export type Role = "admin" | "tl" | "agent";
+export type Role = "admin" | "tl" | "agent" | "manager" | "company_user";
 
 export type User = {
   id: number;
@@ -21,6 +21,14 @@ type AuthContextValue = {
   loading: boolean;
   login: (username: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => void;
+};
+
+const ROLE_HOME: Record<Role, string> = {
+  admin: "/admin",
+  tl: "/tl",
+  agent: "/agent",
+  manager: "/manager",
+  company_user: "/company",
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -51,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStorage.save(res.data.access, res.data.refresh, remember);
     const me = await api.get<User>("/me/");
     setUser(me.data);
-    router.push(me.data.role === "admin" ? "/admin" : me.data.role === "tl" ? "/tl" : "/agent");
+    router.push(ROLE_HOME[me.data.role] ?? "/agent");
   }
 
   function logout() {
