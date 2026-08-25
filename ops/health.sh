@@ -124,7 +124,7 @@ fi
 # --- 5. Next.js Frontend (internal) ------------------------------------------
 section "Next.js Frontend (internal)"
 
-if docker exec whatsapp_crm_nextjs wget -q -O /dev/null http://localhost:3000 2>/dev/null; then
+if docker exec whatsapp_crm_nextjs wget -q -O /dev/null http://127.0.0.1:3000 2>/dev/null; then
     ok "Next.js responding on port 3000"
 else
     fail "Next.js NOT responding on port 3000"

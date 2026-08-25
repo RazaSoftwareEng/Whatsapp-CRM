@@ -285,7 +285,7 @@ fi
 
 # --- frontend answers --------------------------------------------------------
 if [ "$BACKEND_ONLY" = false ]; then
-    if docker exec whatsapp_crm_nextjs wget -q -O /dev/null http://localhost:3000 2>/dev/null; then
+    if docker exec whatsapp_crm_nextjs wget -q -O /dev/null http://127.0.0.1:3000 2>/dev/null; then
         success "Next.js responding on port 3000"
     else
         echo -e "  ${RED}[✗]${NC} Next.js not responding on port 3000"
