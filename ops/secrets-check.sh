@@ -185,7 +185,9 @@ fi
 
 for KEY in CORS_ALLOWED_ORIGINS CSRF_TRUSTED_ORIGINS FRONTEND_URL; do
     VAL=$(get "$KEY")
-    if echo "$VAL" | grep -q "http://"; then
+    if [ -z "$VAL" ]; then
+        continue          # already reported as MISSING/EMPTY above
+    elif echo "$VAL" | grep -q "http://"; then
         fail "$KEY has a plain http:// origin ($VAL) — Secure cookies will not be sent to it"
     else
         ok "$KEY is https-only"

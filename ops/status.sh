@@ -53,9 +53,20 @@ for C in $CONTAINERS; do
         continue
     fi
     HEALTH=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$C" 2>/dev/null)
-    STARTED=$(docker inspect --format='{{.State.StartedAt}}' "$C" 2>/dev/null)
+    # For a RUNNING container `docker ps` gives "Up 3 hours (healthy)".
+    # For a stopped one it gives nothing, so report when it STOPPED (FinishedAt)
+    # and why (ExitCode) — never StartedAt, which reads like an outage start
+    # when it actually means the opposite.
     UPTIME=$(docker ps --filter "name=^${C}$" --format '{{.Status}}' 2>/dev/null)
-    [ -z "$UPTIME" ] && UPTIME="$STARTED"
+    if [ -z "$UPTIME" ]; then
+        FINISHED=$(docker inspect --format='{{.State.FinishedAt}}' "$C" 2>/dev/null | cut -c1-19 | tr 'T' ' ')
+        EXITCODE=$(docker inspect --format='{{.State.ExitCode}}' "$C" 2>/dev/null)
+        if [ "$EXITCODE" = "0" ]; then
+            UPTIME="stopped cleanly at $FINISHED (exit 0)"
+        else
+            UPTIME="CRASHED at $FINISHED (exit $EXITCODE)"
+        fi
+    fi
 
     if [ "$STATE" = "running" ] && [ "$HEALTH" != "unhealthy" ]; then
         printf "  ${GREEN}%-30s %-10s %-16s %s${NC}\n" "$C" "$STATE" "$HEALTH" "$UPTIME"
