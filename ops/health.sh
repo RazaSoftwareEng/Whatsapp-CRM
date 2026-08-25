@@ -1,10 +1,10 @@
 #!/bin/bash
 # =============================================================================
-# health_check.sh — Check status of all CRM services
+# health.sh — Check status of all CRM services
 #
 # Usage:
-#   ./scripts/health_check.sh
-#   ./scripts/health_check.sh --domain crm.yourdomain.com
+#   ./ops/health.sh
+#   ./ops/health.sh --domain api.qomunix.com
 #
 # Checks:
 #   - Docker container status (running / stopped / unhealthy)
@@ -56,6 +56,7 @@ CONTAINERS=(
     "whatsapp_crm_web"
     "whatsapp_crm_celery_worker"
     "whatsapp_crm_celery_beat"
+    "whatsapp_crm_nextjs"
 )
 
 for CONTAINER in "${CONTAINERS[@]}"; do
@@ -120,7 +121,16 @@ else
     fail "Django API not reachable (got: $API_CODE)"
 fi
 
-# --- 5. SSL Certificate ------------------------------------------------------
+# --- 5. Next.js Frontend (internal) ------------------------------------------
+section "Next.js Frontend (internal)"
+
+if docker exec whatsapp_crm_nextjs wget -q -O /dev/null http://localhost:3000 2>/dev/null; then
+    ok "Next.js responding on port 3000"
+else
+    fail "Next.js NOT responding on port 3000"
+fi
+
+# --- 6. SSL Certificate ------------------------------------------------------
 if [ -n "$DOMAIN" ]; then
     section "SSL Certificate ($DOMAIN)"
 
@@ -144,7 +154,7 @@ if [ -n "$DOMAIN" ]; then
     fi
 fi
 
-# --- 6. Disk Space -----------------------------------------------------------
+# --- 7. Disk Space -----------------------------------------------------------
 section "Disk Space"
 
 DISK_USE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
@@ -162,7 +172,7 @@ fi
 DOCKER_SIZE=$(docker system df --format "table {{.Type}}\t{{.Size}}" 2>/dev/null | tail -n +2)
 warn "Docker usage:\n$DOCKER_SIZE"
 
-# --- 7. Memory ---------------------------------------------------------------
+# --- 8. Memory ---------------------------------------------------------------
 section "Memory"
 
 MEM_INFO=$(free -h | awk 'NR==2 {print $3 " used / " $2 " total"}')
