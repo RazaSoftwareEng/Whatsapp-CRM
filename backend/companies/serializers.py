@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Company, Proposal, ProposalActivityLog
+from .validators import validate_uae_pk_phone
 
 
 class CompanySearchSerializer(serializers.ModelSerializer):
@@ -59,6 +60,9 @@ class ProposalCreateSerializer(serializers.ModelSerializer):
         model = Proposal
         fields = ["id", "title", "message", "company", "company_name", "contact_person", "email", "phone"]
         read_only_fields = ["id"]
+
+    def validate_phone(self, value):
+        return validate_uae_pk_phone(value)
 
     def validate(self, attrs):
         # `company` (an exact id from search) takes precedence when present — otherwise

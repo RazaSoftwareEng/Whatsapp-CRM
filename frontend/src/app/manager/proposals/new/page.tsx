@@ -4,6 +4,8 @@ import { useEffect, useState, type SubmitEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
 import { api } from "@/lib/api";
+import { isValidUaePkPhone } from "@/lib/phone";
+import { PhoneInput } from "@/components/ui/PhoneInput";
 import type { CompanyRow } from "@/types/companies";
 
 const DEFAULT_TITLE = "Client confirmation, approval and responsibility for fta tax filing";
@@ -122,7 +124,9 @@ export default function NewProposalPage() {
     }
   }
 
-  const canSubmit = title.trim() && message.trim() && companyFields.company_name.trim() && companyFields.email.trim();
+  const phoneValid = isValidUaePkPhone(companyFields.phone);
+  const canSubmit =
+    title.trim() && message.trim() && companyFields.company_name.trim() && companyFields.email.trim() && phoneValid;
 
   return (
     <div>
@@ -219,14 +223,13 @@ export default function NewProposalPage() {
         <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>
           Phone
         </label>
-        <input
+        <PhoneInput
           value={companyFields.phone}
-          onChange={(e) => updateCompanyField("phone", e.target.value)}
-          className="mb-1 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-[var(--orange)]"
-          style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+          onChange={(v) => updateCompanyField("phone", v)}
+          focusColor="var(--orange)"
         />
-        <p className="mb-4 text-xs" style={{ color: "var(--text-faint)" }}>
-          An invite email will be sent to this address so the company can set up their own login password.
+        <p className="mb-4 mt-1 text-xs" style={{ color: "var(--text-faint)" }}>
+          An invite email will be sent to the address above so the company can set up their own login password.
         </p>
 
         <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-muted)" }}>

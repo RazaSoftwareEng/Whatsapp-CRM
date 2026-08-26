@@ -1,27 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { Copy, MessageCircle, RefreshCw } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { Copy, ExternalLink, Send, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatTime } from "@/lib/format";
 import { FormattedMessage } from "@/components/ui/FormattedMessage";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ProposalActivity, ProposalRow } from "@/types/companies";
 
-function buildWhatsappLink(phone: string, message: string) {
-  const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-}
-
-export default function ProposalDetailPage() {
+export default function AdminProposalDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [proposal, setProposal] = useState<ProposalRow | null>(null);
   const [activity, setActivity] = useState<ProposalActivity[]>([]);
-  const [resending, setResending] = useState(false);
-  const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(() => {
     api.get<ProposalRow>(`/proposals/${params.id}/`).then((res) => setProposal(res.data));
@@ -32,30 +31,39 @@ export default function ProposalDetailPage() {
     load();
   }, [load]);
 
-  async function handleResend() {
-    setResending(true);
-    setNotice("");
-    try {
-      const res = await api.post<ProposalRow>(`/proposals/${params.id}/send/`);
-      setProposal(res.data);
-      setNotice(res.data.email_warning ? `Resend failed: ${res.data.email_warning}` : "Proposal sent for review.");
-      load();
-    } finally {
-      setResending(false);
-    }
-  }
-
   async function copyLink() {
     if (!proposal) return;
-    const link = `${window.location.origin}/review/${proposal.review_token}`;
-    await navigator.clipboard.writeText(link);
+    await navigator.clipboard.writeText(`${window.location.origin}/review/${proposal.review_token}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (!proposal) return null;
+  async function handleSendEmail() {
+    setSending(true);
+    setNotice("");
+    try {
+      const res = await api.post<ProposalRow>(`/proposals/${params.id}/send/`);
+      setProposal(res.data);
+      setNotice(res.data.email_warning ? `Send failed: ${res.data.email_warning}` : "Email sent to the company.");
+      load();
+    } finally {
+      setSending(false);
+    }
+  }
 
-  const reviewLink = `${typeof window !== "undefined" ? window.location.origin : ""}/review/${proposal.review_token}`;
+  async function handleDelete() {
+    setDeleting(true);
+    setError("");
+    try {
+      await api.delete(`/proposals/${params.id}/`);
+      router.push("/admin/proposals");
+    } catch {
+      setError("Could not delete this proposal — please try again.");
+      setDeleting(false);
+    }
+  }
+
+  if (!proposal) return null;
 
   return (
     <div>
@@ -66,13 +74,22 @@ export default function ProposalDetailPage() {
         <StatusPill status={proposal.status} />
       </div>
       <p className="mb-6 text-sm" style={{ color: "var(--text-muted)" }}>
-        {proposal.company.company_name} · updated {formatDate(proposal.updated_at)}
+        {proposal.company.company_name} · created by {proposal.created_by_username || "—"} · updated{" "}
+        {formatDate(proposal.updated_at)}
       </p>
 
+      {error && (
+        <p className="mb-4 max-w-xl rounded-lg px-3 py-2 text-sm" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
       {notice && (
         <p
           className="mb-4 max-w-xl rounded-lg px-3 py-2 text-sm"
-          style={{ background: "var(--orange-soft)", color: "var(--orange)" }}
+          style={{
+            background: notice.startsWith("Send failed") ? "var(--danger-soft)" : "var(--success-soft)",
+            color: notice.startsWith("Send failed") ? "var(--danger)" : "var(--success)",
+          }}
         >
           {notice}
         </p>
@@ -89,24 +106,31 @@ export default function ProposalDetailPage() {
           <FormattedMessage text={proposal.message} />
 
           {proposal.last_email_error && (
-            <p
-              className="mt-4 rounded-lg px-3 py-2 text-xs"
-              style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
-            >
+            <p className="mt-4 rounded-lg px-3 py-2 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
               Last send error: {proposal.last_email_error}
             </p>
           )}
 
           <div className="mt-5 flex flex-wrap gap-2">
             <button
-              onClick={handleResend}
-              disabled={resending}
+              onClick={handleSendEmail}
+              disabled={sending}
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              style={{ background: "var(--orange)" }}
+              style={{ background: "var(--indigo)" }}
             >
-              <RefreshCw size={13} />
-              {resending ? "Sending…" : "Resend review email"}
+              <Send size={13} />
+              {sending ? "Sending…" : "Send Email"}
             </button>
+            <a
+              href={`/review/${proposal.review_token}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
+              style={{ borderColor: "var(--border)", color: "var(--indigo)" }}
+            >
+              <ExternalLink size={13} />
+              Open review link
+            </a>
             <button
               onClick={copyLink}
               className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
@@ -115,17 +139,37 @@ export default function ProposalDetailPage() {
               <Copy size={13} />
               {copied ? "Copied!" : "Copy review link"}
             </button>
-            {proposal.company.phone && (
-              <a
-                href={buildWhatsappLink(proposal.company.phone, `${proposal.message}\n\n${reviewLink}`)}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
-                style={{ borderColor: "var(--border)", color: "var(--teal-strong)" }}
+
+            {!confirmingDelete ? (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="ml-auto flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium"
+                style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
               >
-                <MessageCircle size={13} />
-                Share via WhatsApp
-              </a>
+                <Trash2 size={13} />
+                Delete proposal
+              </button>
+            ) : (
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Delete this proposal permanently?
+                </span>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  style={{ background: "var(--danger)" }}
+                >
+                  {deleting ? "Deleting…" : "Confirm"}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="rounded-lg border px-3 py-1.5 text-xs font-medium"
+                  style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         </div>

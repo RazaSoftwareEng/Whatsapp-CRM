@@ -3,6 +3,8 @@ import secrets
 from django.conf import settings
 from django.db import models
 
+from .validators import company_phone_validator
+
 
 class Company(models.Model):
     class Status(models.TextChoices):
@@ -12,7 +14,7 @@ class Company(models.Model):
     company_name = models.CharField(max_length=200)
     contact_person = models.CharField(max_length=150, blank=True)
     email = models.EmailField(unique=True)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=20, blank=True, validators=[company_phone_validator])
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="companies_created"

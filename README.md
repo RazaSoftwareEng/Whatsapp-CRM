@@ -1,4 +1,4 @@
-# WhatsApp CRM
+# WhatsApp CRM  README file
 
 A production-ready, multi-agent WhatsApp CRM built with Django REST Framework and Next.js. It integrates with the Meta WhatsApp Cloud API to receive and send messages, auto-create leads, and manage agent workloads from a central dashboard.
 

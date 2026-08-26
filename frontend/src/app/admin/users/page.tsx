@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState, type SubmitEvent } from "react";
-import { UserPlus } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { Role, UserRow } from "@/types/admin";
+
+const ROLE_FILTER_OPTIONS: { value: Role | ""; label: string }[] = [
+  { value: "", label: "All roles" },
+  { value: "admin", label: "Admin" },
+  { value: "tl", label: "Team Lead" },
+  { value: "agent", label: "Agent" },
+  { value: "manager", label: "Manager" },
+  { value: "company_user", label: "Company User" },
+];
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: "Admin",
@@ -45,6 +54,8 @@ export default function UsersPage() {
   });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<Role | "">("");
 
   const loadUsers = useCallback(() => {
     api.get<UserRow[]>("/users/").then((res) => setUsers(res.data));
@@ -57,6 +68,18 @@ export default function UsersPage() {
   }, [loadUsers]);
 
   const teamLeads = users.filter((u) => u.role === "tl");
+
+  const filteredUsers = users.filter((u) => {
+    if (roleFilter && u.role !== roleFilter) return false;
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const roleCounts = users.reduce<Record<string, number>>((acc, u) => {
+    acc[u.role] = (acc[u.role] ?? 0) + 1;
+    return acc;
+  }, {});
 
   async function createUser(e: SubmitEvent) {
     e.preventDefault();
@@ -81,21 +104,65 @@ export default function UsersPage() {
       <h1 className="mb-1 text-xl font-semibold" style={{ color: "var(--text)" }}>
         Total Users
       </h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--text-muted)" }}>
+      <p className="mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
         Every account with access to this workspace, admins included.
       </p>
 
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <div
-          className="overflow-hidden rounded-2xl border"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+      <div className="mb-6 flex flex-wrap gap-2">
+        <button
+          onClick={() => setRoleFilter("")}
+          className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+          style={
+            roleFilter === ""
+              ? { color: "var(--indigo)", background: "var(--indigo-soft)", borderColor: "transparent" }
+              : { color: "var(--text-muted)", borderColor: "var(--border)", background: "var(--surface)" }
+          }
         >
-          {users.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              No users yet.
-            </p>
-          )}
-          {users.map((u, i) => (
+          All Users · {users.length}
+        </button>
+        {ROLE_FILTER_OPTIONS.slice(1).map((r) => (
+          <button
+            key={r.value}
+            onClick={() => setRoleFilter(roleFilter === r.value ? "" : (r.value as Role))}
+            className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+            style={
+              roleFilter === r.value
+                ? { ...ROLE_STYLES[r.value as Role], borderColor: "transparent" }
+                : { color: "var(--text-muted)", borderColor: "var(--border)", background: "var(--surface)" }
+            }
+          >
+            {r.label} · {roleCounts[r.value] ?? 0}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+        <div>
+          <div className="relative mb-3">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--text-faint)" }}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by username or email"
+              className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none focus:border-[var(--indigo)]"
+              style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text)" }}
+            />
+          </div>
+
+          <div
+            className="overflow-hidden rounded-2xl border"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+          >
+            {filteredUsers.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                {users.length === 0 ? "No users yet." : "No users match your search/filter."}
+              </p>
+            )}
+            {filteredUsers.map((u, i) => (
             <div
               key={u.id}
               className="flex items-center gap-3 px-4 py-3"
@@ -115,6 +182,7 @@ export default function UsersPage() {
               <StatusPill status={u.status} />
             </div>
           ))}
+          </div>
         </div>
 
         <form

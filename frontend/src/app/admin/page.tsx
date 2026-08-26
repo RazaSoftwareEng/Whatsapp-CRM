@@ -2,23 +2,30 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Inbox, MessageCircle, MessagesSquare, Users } from "lucide-react";
+import { ArrowRight, FileText, Inbox, MessageCircle, MessagesSquare, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { Avatar } from "@/components/ui/Avatar";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, Message, UserRow } from "@/types/admin";
+import type { DashboardStats, ProposalActivity } from "@/types/companies";
+
+const EMPTY_PROPOSAL_STATS: DashboardStats = { total: 0, pending_review: 0, approved: 0, rejected: 0, changes_requested: 0 };
 
 export default function DashboardPage() {
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [proposalStats, setProposalStats] = useState<DashboardStats>(EMPTY_PROPOSAL_STATS);
+  const [proposalActivity, setProposalActivity] = useState<ProposalActivity[]>([]);
 
   const loadData = useCallback(() => {
     api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
     api.get<UserRow[]>("/users/").then((res) => setUsers(res.data));
     api.get<Message[]>("/messages/").then((res) => setMessages(res.data));
+    api.get<DashboardStats>("/proposals/dashboard/").then((res) => setProposalStats(res.data));
+    api.get<ProposalActivity[]>("/proposals/activity/?limit=5").then((res) => setProposalActivity(res.data));
   }, []);
 
   useEffect(() => {
@@ -138,6 +145,73 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div
+        className="mb-8 rounded-2xl border p-5"
+        style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+            Proposals
+          </h2>
+          <Link
+            href="/admin/proposals"
+            className="flex items-center gap-1 text-xs font-medium"
+            style={{ color: "var(--indigo)" }}
+          >
+            View all proposals <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[
+            { label: "Total", value: proposalStats.total, color: "var(--indigo)" },
+            { label: "Pending review", value: proposalStats.pending_review, color: "var(--warning)" },
+            { label: "Approved", value: proposalStats.approved, color: "var(--success)" },
+            { label: "Rejected", value: proposalStats.rejected, color: "var(--danger)" },
+            { label: "Changes requested", value: proposalStats.changes_requested, color: "var(--orange)" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl p-3" style={{ background: "var(--surface-2)" }}>
+              <p className="text-xl font-semibold tabular-nums" style={{ color: s.color }}>
+                {s.value}
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {proposalActivity.length === 0 ? (
+          <p className="py-4 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+            No proposal activity yet.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {proposalActivity.map((a) => (
+              <div key={a.id} className="flex items-center gap-3">
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                  style={{ background: "var(--indigo-soft)", color: "var(--indigo)" }}
+                >
+                  <FileText size={15} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                    {a.proposal_title}
+                  </p>
+                  <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
+                    {a.action_display} {a.actor_username ? `by ${a.actor_username}` : "via review link"}
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                  {formatTime(a.created_at)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">

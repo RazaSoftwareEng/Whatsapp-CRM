@@ -10,10 +10,19 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
+
+# Windows' console defaults to the cp1252 codepage, which can't encode Arabic/etc. — the
+# console EMAIL_BACKEND writes outgoing messages to stdout, so without this, sending any
+# email containing non-Latin text (e.g. the Arabic half of a proposal) raises
+# UnicodeEncodeError and the send is reported as failed. Harmless no-op on Linux/macOS.
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Inbox, LayoutDashboard, LogOut, Headset, MessageCircle, ShieldAlert, Users } from "lucide-react";
+import { Building2, Inbox, LayoutDashboard, ListChecks, LogOut, Headset, MessageCircle, ShieldAlert, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/ui/Logo";
 
@@ -13,6 +13,8 @@ const NAV_ITEMS = [
   { href: "/admin/chats", label: "Chats", icon: MessageCircle },
   { href: "/admin/agents", label: "Agent", icon: Headset },
   { href: "/admin/users", label: "Total Users", icon: Users },
+  { href: "/admin/proposals", label: "Proposals", icon: ListChecks },
+  { href: "/admin/companies", label: "Companies", icon: Building2 },
   { href: "/admin/violations", label: "Violations", icon: ShieldAlert },
 ];
 

@@ -195,15 +195,19 @@ class ProposalViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
-        """Resend the proposal review email — allowed from draft or changes_requested."""
+        """(Re)send the proposal review email — allowed from any status, e.g. the client
+        says they never got it. Draft/changes_requested also move to pending_review since
+        this is what starts (or restarts) their review clock; other statuses are left as-is
+        so a courtesy resend can't silently undo an approve/reject decision."""
         proposal = self.get_object()
-        if proposal.status not in (Proposal.Status.DRAFT, Proposal.Status.CHANGES_REQUESTED):
-            raise ValidationError({"detail": "Only a draft or changes-requested proposal can be (re)sent."})
         try:
             send_proposal_review_email(proposal)
-            proposal.status = Proposal.Status.PENDING_REVIEW
+            update_fields = ["last_email_error"]
             proposal.last_email_error = ""
-            proposal.save(update_fields=["status", "last_email_error"])
+            if proposal.status in (Proposal.Status.DRAFT, Proposal.Status.CHANGES_REQUESTED):
+                proposal.status = Proposal.Status.PENDING_REVIEW
+                update_fields.append("status")
+            proposal.save(update_fields=update_fields)
             ProposalActivityLog.objects.create(proposal=proposal, actor=request.user, action="resent")
             return Response(ProposalSerializer(proposal).data)
         except Exception as exc:  # noqa: BLE001
