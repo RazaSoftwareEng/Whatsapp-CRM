@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -24,6 +24,9 @@ export default function AdminProposalsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "">("");
   const [managerFilter, setManagerFilter] = useState("");
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [rowError, setRowError] = useState<{ id: number; message: string } | null>(null);
 
   const load = useCallback(() => {
     api.get<ProposalRow[]>("/proposals/").then((res) => setProposals(res.data));
@@ -43,6 +46,20 @@ export default function AdminProposalsPage() {
     const q = search.trim().toLowerCase();
     return p.title.toLowerCase().includes(q) || p.company.company_name.toLowerCase().includes(q);
   });
+
+  async function deleteProposal(id: number) {
+    setDeletingId(id);
+    setRowError(null);
+    try {
+      await api.delete(`/proposals/${id}/`);
+      setConfirmingId(null);
+      load();
+    } catch {
+      setRowError({ id, message: "Could not delete this proposal." });
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div>
@@ -140,9 +157,47 @@ export default function AdminProposalsPage() {
                   {formatDate(p.updated_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Link href={`/admin/proposals/${p.id}`} className="text-xs font-medium" style={{ color: "var(--indigo)" }}>
-                    View
-                  </Link>
+                  {confirmingId === p.id ? (
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                        Delete?
+                      </span>
+                      <button
+                        onClick={() => deleteProposal(p.id)}
+                        disabled={deletingId === p.id}
+                        className="text-xs font-medium disabled:opacity-50"
+                        style={{ color: "var(--danger)" }}
+                      >
+                        {deletingId === p.id ? "…" : "Yes"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmingId(null)}
+                        className="text-xs font-medium"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-end gap-3">
+                      <Link href={`/admin/proposals/${p.id}`} className="text-xs font-medium" style={{ color: "var(--indigo)" }}>
+                        View
+                      </Link>
+                      <button
+                        onClick={() => setConfirmingId(p.id)}
+                        className="inline-flex items-center transition-colors hover:opacity-70"
+                        style={{ color: "var(--danger)" }}
+                        title="Delete proposal"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                  {rowError?.id === p.id && (
+                    <p className="mt-1 text-[11px]" style={{ color: "var(--danger)" }}>
+                      {rowError.message}
+                    </p>
+                  )}
                 </td>
               </tr>
             ))}
