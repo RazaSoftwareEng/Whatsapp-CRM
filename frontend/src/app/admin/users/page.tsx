@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type SubmitEvent } from "react";
-import { Search, UserPlus } from "lucide-react";
+import { Search, Trash2, UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -44,6 +45,7 @@ function RoleBadge({ role }: { role: Role }) {
 }
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [newUser, setNewUser] = useState({
     username: "",
@@ -56,6 +58,7 @@ export default function UsersPage() {
   const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "">("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const loadUsers = useCallback(() => {
     api.get<UserRow[]>("/users/").then((res) => setUsers(res.data));
@@ -80,6 +83,19 @@ export default function UsersPage() {
     acc[u.role] = (acc[u.role] ?? 0) + 1;
     return acc;
   }, {});
+
+  async function deleteUser(u: UserRow) {
+    if (!window.confirm(`Delete ${u.username}? This cannot be undone.`)) return;
+    setDeletingId(u.id);
+    try {
+      await api.delete(`/users/${u.id}/`);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch {
+      alert("Could not delete this user.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function createUser(e: SubmitEvent) {
     e.preventDefault();
@@ -180,6 +196,17 @@ export default function UsersPage() {
               </div>
               <RoleBadge role={u.role} />
               <StatusPill status={u.status} />
+              {currentUser?.id !== u.id && (
+                <button
+                  onClick={() => deleteUser(u)}
+                  disabled={deletingId === u.id}
+                  title="Delete user"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-70 disabled:opacity-40"
+                  style={{ color: "var(--danger)" }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
           ))}
           </div>
