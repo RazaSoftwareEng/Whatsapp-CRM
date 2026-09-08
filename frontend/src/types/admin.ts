@@ -35,6 +35,7 @@ export type Message = {
   chat: number;
   direction: "in" | "out";
   body: string;
+  media_url: string;
   delivery_status: string;
   sent_at: string;
 };

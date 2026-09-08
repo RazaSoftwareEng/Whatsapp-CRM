@@ -8,6 +8,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { formatTime } from "@/lib/format";
 import { NewContactForm } from "@/components/NewContactForm";
+import { MessageContent } from "@/components/ui/MessageContent";
 import type { ChatRow, ChatDetail, UserRow } from "@/types/admin";
 
 export default function TLChatsPage() {
@@ -197,7 +198,7 @@ export default function TLChatsPage() {
                           : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-sm)" }
                       }
                     >
-                      <p className="leading-relaxed">{m.body}</p>
+                      <MessageContent body={m.body} mediaUrl={m.media_url} />
                       <div
                         className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
                         style={m.direction === "in" ? { color: "var(--text-faint)" } : undefined}

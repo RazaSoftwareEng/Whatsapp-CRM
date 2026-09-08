@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { formatTime } from "@/lib/format";
+import { MessageContent } from "@/components/ui/MessageContent";
 import type { ChatRow, ChatDetail } from "@/types/admin";
 
 export default function AdminChatsPage() {
@@ -186,7 +187,7 @@ export default function AdminChatsPage() {
                           : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-sm)" }
                       }
                     >
-                      <p className="leading-relaxed">{m.body}</p>
+                      <MessageContent body={m.body} mediaUrl={m.media_url} />
                       <div
                         className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
                         style={m.direction === "in" ? { color: "var(--text-faint)" } : undefined}
