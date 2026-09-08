@@ -7,14 +7,17 @@ import { Avatar } from "@/components/ui/Avatar";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { formatTime } from "@/lib/format";
-import type { ChatRow, ChatDetail } from "@/types/admin";
+import { NewContactForm } from "@/components/NewContactForm";
+import type { ChatRow, ChatDetail, UserRow } from "@/types/admin";
 
 export default function TLChatsPage() {
   const [chats, setChats] = useState<ChatRow[]>([]);
+  const [agents, setAgents] = useState<UserRow[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeChat, setActiveChat] = useState<ChatDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   const loadChats = useCallback(() => {
     api.get<ChatRow[]>("/chats/").then((res) => {
@@ -25,6 +28,10 @@ export default function TLChatsPage() {
 
   const loadActive = useCallback((id: number) => {
     api.get<ChatDetail>(`/chats/${id}/`).then((res) => setActiveChat(res.data));
+  }, []);
+
+  useEffect(() => {
+    api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data));
   }, []);
 
   useEffect(() => {
@@ -41,6 +48,22 @@ export default function TLChatsPage() {
     api.post(`/chats/${activeId}/mark_read/`).catch(() => {});
     return () => clearInterval(t);
   }, [activeId, loadActive]);
+
+  async function assignChat(userId: string) {
+    if (!activeId) return;
+    setAssigning(true);
+    try {
+      const res = await api.post<ChatRow>(`/chats/${activeId}/assign/`, {
+        user_id: userId ? Number(userId) : null,
+      });
+      setChats((prev) => prev.map((c) => (c.id === activeId ? { ...c, ...res.data } : c)));
+      setActiveChat((prev) => (prev ? { ...prev, ...res.data } : prev));
+    } catch {
+      alert("Could not assign this chat.");
+    } finally {
+      setAssigning(false);
+    }
+  }
 
   async function sendReply(e: SubmitEvent) {
     e.preventDefault();
@@ -61,7 +84,7 @@ export default function TLChatsPage() {
         Team chats
       </h1>
       <p className="mb-6 text-sm" style={{ color: "var(--text-muted)" }}>
-        Every conversation owned by you or your agents.
+        Every conversation across the workspace. Assign new or unassigned chats to your own agents.
       </p>
 
       <div
@@ -75,6 +98,12 @@ export default function TLChatsPage() {
         }}
       >
         <div className="flex w-72 shrink-0 flex-col overflow-y-auto border-r" style={{ borderColor: "var(--border)" }}>
+          <NewContactForm
+            onCreated={(chat) => {
+              setChats((prev) => [chat, ...prev.filter((c) => c.id !== chat.id)]);
+              setActiveId(chat.id);
+            }}
+          />
           {chats.length === 0 && (
             <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
               No chats yet.
@@ -127,9 +156,22 @@ export default function TLChatsPage() {
                   </p>
                   <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
                     {activeChat.lead.phone_number}
-                    {activeChat.assigned_user_username ? ` · assigned to ${activeChat.assigned_user_username}` : ""}
                   </p>
                 </div>
+                <select
+                  value={activeChat.assigned_user ?? ""}
+                  onChange={(e) => assignChat(e.target.value)}
+                  disabled={assigning}
+                  className="rounded-lg border px-2 py-1.5 text-xs outline-none focus:border-[var(--teal)] disabled:opacity-50"
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+                >
+                  <option value="">Unassigned</option>
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.username}
+                    </option>
+                  ))}
+                </select>
                 <StatusPill status={activeChat.status} />
               </div>
 
