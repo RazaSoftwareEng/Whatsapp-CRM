@@ -12,6 +12,8 @@ import { CopyGuard } from "@/components/CopyGuard";
 import { NewContactForm } from "@/components/NewContactForm";
 import { formatTime } from "@/lib/format";
 import { MessageContent } from "@/components/ui/MessageContent";
+import { JumpToLatestButton } from "@/components/ui/JumpToLatestButton";
+import { useAutoScroll } from "@/lib/useAutoScroll";
 import type { ChatDetail, ChatRow as ChatSummary } from "@/types/admin";
 
 export default function AgentPage() {
@@ -22,6 +24,10 @@ export default function AgentPage() {
   const [activeChat, setActiveChat] = useState<ChatDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
+    activeChat?.messages.length ?? 0,
+    activeId
+  );
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -160,8 +166,11 @@ export default function AgentPage() {
               </div>
             </div>
 
+            <div className="relative flex-1 overflow-hidden">
             <div
-              className="flex-1 space-y-2.5 overflow-y-auto px-6 py-5"
+              ref={containerRef}
+              onScroll={onScroll}
+              className="h-full space-y-2.5 overflow-y-auto px-6 py-5"
               style={{
                 background:
                   "radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/18px 18px, var(--bg)",
@@ -193,6 +202,8 @@ export default function AgentPage() {
                   </div>
                 </div>
               ))}
+            </div>
+            {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} accent="var(--teal-strong)" />}
             </div>
 
             <form

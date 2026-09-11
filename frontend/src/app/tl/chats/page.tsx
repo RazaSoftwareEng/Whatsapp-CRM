@@ -9,6 +9,8 @@ import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { formatTime } from "@/lib/format";
 import { NewContactForm } from "@/components/NewContactForm";
 import { MessageContent } from "@/components/ui/MessageContent";
+import { JumpToLatestButton } from "@/components/ui/JumpToLatestButton";
+import { useAutoScroll } from "@/lib/useAutoScroll";
 import type { ChatRow, ChatDetail, UserRow } from "@/types/admin";
 
 export default function TLChatsPage() {
@@ -19,6 +21,10 @@ export default function TLChatsPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
+    activeChat?.messages.length ?? 0,
+    activeId
+  );
 
   const loadChats = useCallback(() => {
     api.get<ChatRow[]>("/chats/").then((res) => {
@@ -176,8 +182,11 @@ export default function TLChatsPage() {
                 <StatusPill status={activeChat.status} />
               </div>
 
+              <div className="relative flex-1 overflow-hidden">
               <div
-                className="flex-1 space-y-2.5 overflow-y-auto px-5 py-4"
+                ref={containerRef}
+                onScroll={onScroll}
+                className="h-full space-y-2.5 overflow-y-auto px-5 py-4"
                 style={{
                   background:
                     "radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/18px 18px, var(--bg)",
@@ -209,6 +218,8 @@ export default function TLChatsPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+              {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} accent="var(--teal-strong)" />}
               </div>
 
               <form onSubmit={sendReply} className="flex gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>

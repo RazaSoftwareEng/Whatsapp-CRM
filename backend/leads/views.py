@@ -1,4 +1,5 @@
 import requests
+from django.db.models import F
 from django.utils import timezone
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
@@ -39,7 +40,9 @@ class ChatViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Chat.objects.select_related("lead", "assigned_user")
+        qs = Chat.objects.select_related("lead", "assigned_user").order_by(
+            F("last_message_at").desc(nulls_last=True)
+        )
         if user.role in ("admin", "tl"):
             return qs
         return qs.filter(assigned_user=user)
