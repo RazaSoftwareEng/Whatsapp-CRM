@@ -196,6 +196,12 @@ WHATSAPP_TOKEN = config("WHATSAPP_TOKEN", default="")
 WHATSAPP_PHONE_NUMBER_ID = config("WHATSAPP_PHONE_NUMBER_ID", default="")
 WHATSAPP_VERIFY_TOKEN = config("WHATSAPP_VERIFY_TOKEN", default="")
 
+# Approved template used by managers to start a chat with a brand-new contact
+# (WhatsApp requires an approved template for the first message to anyone who
+# hasn't messaged us first — a plain-text message would be rejected).
+WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME = config("WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME", default="crm_first_contract")
+WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE = config("WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE", default="en")
+
 
 # Email — console backend prints to the runserver console for local dev.
 # Swap EMAIL_BACKEND to smtp + fill EMAIL_HOST* once real SMTP creds exist — no code changes needed.

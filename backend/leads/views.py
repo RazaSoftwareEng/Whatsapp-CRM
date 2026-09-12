@@ -1,4 +1,5 @@
 import requests
+from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 from rest_framework import permissions, viewsets
@@ -6,20 +7,26 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.models import User
-from accounts.permissions import IsAdmin, IsTL
+from accounts.permissions import IsAdmin, IsManager, IsTL
 
 from .models import Chat, Lead, Message, Tag
 from .serializers import ChatDetailSerializer, ChatSerializer, LeadSerializer, MessageSerializer, TagSerializer
-from .services import send_whatsapp_text
+from .services import send_whatsapp_template, send_whatsapp_text
+
+MANAGER_LEAD_SOURCE = "manager"
 
 
 class IsAdminOrTLOrOwnChat(permissions.BasePermission):
-    """Admin and TL: full read access to every chat. Agent: only chats assigned to them."""
+    """Admin: full access. TL: every chat except manager-started ones (those are
+    private to the manager who started them, and admin). Agent/Manager: only
+    chats assigned to them."""
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        if user.role in ("admin", "tl"):
+        if user.role == "admin":
             return True
+        if user.role == "tl":
+            return obj.lead.source != MANAGER_LEAD_SOURCE
         return obj.assigned_user_id == user.id
 
 
@@ -45,8 +52,10 @@ class ChatViewSet(viewsets.ModelViewSet):
             .prefetch_related("lead__tags", "messages")
             .order_by(F("last_message_at").desc(nulls_last=True))
         )
-        if user.role in ("admin", "tl"):
+        if user.role == "admin":
             return qs
+        if user.role == "tl":
+            return qs.exclude(lead__source=MANAGER_LEAD_SOURCE)
         return qs.filter(assigned_user=user)
 
     def get_serializer_class(self):
@@ -88,19 +97,19 @@ class ChatViewSet(viewsets.ModelViewSet):
         chat.save(update_fields=["assigned_user", "status"])
         return Response(ChatSerializer(chat).data)
 
-    @action(detail=False, methods=["post"])
-    def start(self, request):
-        """Admin/TL/agent: add a new contact and start (or claim) its chat."""
+    def _get_or_create_lead_and_chat(self, request, source):
+        """Shared by start/start_with_template: upsert the Lead by phone number,
+        then get-or-create its Chat and (re)claim it for the requesting user."""
         phone_number = (request.data.get("phone_number") or "").strip()
         if not phone_number:
-            return Response({"detail": "phone_number is required."}, status=400)
+            return None, None, Response({"detail": "phone_number is required."}, status=400)
 
         lead_fields = {
             "name": (request.data.get("name") or "").strip(),
             "company_name": (request.data.get("company_name") or "").strip(),
             "email": (request.data.get("email") or "").strip(),
             "client_status": request.data.get("client_status") or Lead.ClientStatus.FIRST_TIME,
-            "source": "manual",
+            "source": source,
         }
         lead, created = Lead.objects.get_or_create(phone_number=phone_number, defaults=lead_fields)
         if not created:
@@ -117,7 +126,56 @@ class ChatViewSet(viewsets.ModelViewSet):
             chat.status = Chat.Status.IN_PROGRESS
             chat.save(update_fields=["assigned_user", "status"])
 
+        return lead, chat, None
+
+    @action(detail=False, methods=["post"])
+    def start(self, request):
+        """Admin/TL/agent: add a new contact and start (or claim) its chat."""
+        _, chat, error = self._get_or_create_lead_and_chat(request, source="manual")
+        if error:
+            return error
         return Response(ChatSerializer(chat).data, status=201)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="start-with-template",
+        permission_classes=[permissions.IsAuthenticated, IsManager | IsAdmin],
+    )
+    def start_with_template(self, request):
+        """Manager/Admin: add a brand-new contact and open the chat with our
+        approved first-contact template (required — WhatsApp rejects a plain-
+        text first message to someone who hasn't messaged us before). The
+        resulting chat is tagged so it stays private to this manager + admin
+        (see IsAdminOrTLOrOwnChat and the TL/agent querysets above)."""
+        lead, chat, error = self._get_or_create_lead_and_chat(request, source=MANAGER_LEAD_SOURCE)
+        if error:
+            return error
+
+        template_name = settings.WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME
+        template_body = (
+            "Hi, this is Al Merak Tax Consultant. We're reaching out regarding your inquiry. "
+            "Reply to this message and we'll assist you right away."
+        )
+        message = Message.objects.create(
+            chat=chat,
+            direction=Message.Direction.OUT,
+            body=template_body,
+            delivery_status=Message.DeliveryStatus.PENDING,
+        )
+        try:
+            result = send_whatsapp_template(
+                lead.phone_number, template_name, settings.WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE
+            )
+            message.wa_message_id = result.get("messages", [{}])[0].get("id", "")
+            message.delivery_status = Message.DeliveryStatus.SENT
+        except requests.RequestException:
+            message.delivery_status = Message.DeliveryStatus.FAILED
+        message.save(update_fields=["wa_message_id", "delivery_status"])
+
+        chat.last_message_at = timezone.now()
+        chat.save(update_fields=["last_message_at"])
+        return Response(ChatDetailSerializer(chat).data, status=201)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -126,9 +184,11 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Message.objects.select_related("chat")
-        if user.role in ("admin", "tl"):
+        qs = Message.objects.select_related("chat", "chat__lead")
+        if user.role == "admin":
             return qs
+        if user.role == "tl":
+            return qs.exclude(chat__lead__source=MANAGER_LEAD_SOURCE)
         return qs.filter(chat__assigned_user=user)
 
     def perform_create(self, serializer):

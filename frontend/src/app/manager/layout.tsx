@@ -3,12 +3,13 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, FilePlus, LayoutDashboard, ListChecks, LogOut } from "lucide-react";
+import { Building2, FilePlus, LayoutDashboard, ListChecks, LogOut, MessageCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/ui/Logo";
 
 const NAV_ITEMS = [
   { href: "/manager", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/manager/chats", label: "Chats", icon: MessageCircle },
   { href: "/manager/proposals", label: "Proposals", icon: ListChecks },
   { href: "/manager/proposals/new", label: "New Proposal", icon: FilePlus },
   { href: "/manager/companies", label: "Companies", icon: Building2 },

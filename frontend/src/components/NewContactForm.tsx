@@ -19,19 +19,31 @@ const EMPTY = {
   client_status: "first_time" as ClientStatus,
 };
 
-/** Compact "add a new contact and start a chat" form used by the agent and team-lead views.
- * `openSignal`, if given, pops the form open each time it changes — lets a button
- * elsewhere (e.g. the persistent sidebar) trigger this without owning its state. */
+/** Compact "add a new contact and start a chat" form used by the agent, team-lead
+ * and manager views. `openSignal`, if given, pops the form open each time it
+ * changes — lets a button elsewhere (e.g. the persistent sidebar) trigger this
+ * without owning its state. */
 export function NewContactForm({
   onCreated,
   openSignal,
   hideTrigger,
+  endpoint = "/chats/start/",
+  templatePreview,
+  accent = "var(--whatsapp-strong)",
 }: {
   onCreated: (chat: ChatRow) => void;
   openSignal?: number;
   /** Hide the built-in "New chat" toggle — use when an external button (e.g. the
    * sidebar) drives `openSignal` instead, so there isn't a duplicate button. */
   hideTrigger?: boolean;
+  /** Where to POST the new contact — defaults to the plain "start a chat" flow.
+   * Pass "/chats/start-with-template/" for the manager flow, which sends our
+   * approved first-contact template instead of just creating an empty chat. */
+  endpoint?: string;
+  /** When set, shows this as a read-only preview of the first message that will
+   * be sent (manager/template flow) and relabels the submit button accordingly. */
+  templatePreview?: string;
+  accent?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState(EMPTY);
@@ -50,7 +62,7 @@ export function NewContactForm({
     if (!values.phone_number.trim()) return;
     setSubmitting(true);
     try {
-      const res = await api.post<ChatRow>("/chats/start/", values);
+      const res = await api.post<ChatRow>(endpoint, values);
       onCreated(res.data);
       setValues(EMPTY);
       setOpen(false);
@@ -65,7 +77,7 @@ export function NewContactForm({
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium transition-colors hover:opacity-80"
-          style={{ borderColor: "var(--border)", color: "var(--teal-strong)" }}
+          style={{ borderColor: "var(--border)", color: accent }}
         >
           <UserPlus size={13} />
           New chat
@@ -115,13 +127,24 @@ export function NewContactForm({
               </option>
             ))}
           </select>
+          {templatePreview && (
+            <div
+              className="rounded-lg border px-3 py-2 text-[11px] leading-relaxed"
+              style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+            >
+              <p className="mb-1 font-semibold uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>
+                First message (template)
+              </p>
+              {templatePreview}
+            </div>
+          )}
           <button
             type="submit"
             disabled={submitting || !values.phone_number.trim()}
             className="w-full rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: "var(--whatsapp-strong)" }}
+            style={{ background: accent }}
           >
-            {submitting ? "Starting…" : "Start chat"}
+            {submitting ? "Starting…" : templatePreview ? "Send template & start chat" : "Start chat"}
           </button>
         </form>
       )}
