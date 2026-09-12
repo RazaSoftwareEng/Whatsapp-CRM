@@ -199,7 +199,7 @@ WHATSAPP_VERIFY_TOKEN = config("WHATSAPP_VERIFY_TOKEN", default="")
 # Approved template used by managers to start a chat with a brand-new contact
 # (WhatsApp requires an approved template for the first message to anyone who
 # hasn't messaged us first — a plain-text message would be rejected).
-WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME = config("WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME", default="crm_first_contract")
+WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME = config("WHATSAPP_FIRST_CONTACT_TEMPLATE_NAME", default="crm_message_template1")
 WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE = config("WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE", default="en")
 
 
