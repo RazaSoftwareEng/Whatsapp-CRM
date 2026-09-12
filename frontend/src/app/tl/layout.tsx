@@ -66,7 +66,7 @@ function TLLayoutInner({ children }: { children: ReactNode }) {
         <button
           onClick={startNewChat}
           className="mb-3 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, var(--teal), var(--indigo))" }}
+          style={{ background: "var(--whatsapp-strong)" }}
         >
           <UserPlus size={15} />
           New chat

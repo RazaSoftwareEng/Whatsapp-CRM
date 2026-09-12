@@ -14,7 +14,7 @@ export function ChatListControls({
   tab,
   onTabChange,
   counts,
-  accent = "var(--indigo)",
+  accent = "var(--whatsapp-strong)",
 }: {
   search: string;
   onSearchChange: (v: string) => void;

@@ -119,7 +119,7 @@ export function NewContactForm({
             type="submit"
             disabled={submitting || !values.phone_number.trim()}
             className="w-full rounded-lg px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg, var(--teal), var(--indigo))" }}
+            style={{ background: "var(--whatsapp-strong)" }}
           >
             {submitting ? "Starting…" : "Start chat"}
           </button>

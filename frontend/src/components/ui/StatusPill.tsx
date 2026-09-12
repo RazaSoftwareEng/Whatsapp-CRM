@@ -3,7 +3,7 @@ const STATUS_STYLES: Record<string, { fg: string; bg: string; label: string }> =
   in_progress: { fg: "var(--teal-strong)", bg: "var(--teal-soft)", label: "In progress" },
   closed: { fg: "var(--text-faint)", bg: "var(--surface-2)", label: "Closed" },
   pending: { fg: "var(--text-faint)", bg: "var(--surface-2)", label: "Pending" },
-  sent: { fg: "var(--indigo)", bg: "var(--indigo-soft)", label: "Sent" },
+  sent: { fg: "var(--whatsapp-strong)", bg: "var(--whatsapp-soft)", label: "Sent" },
   delivered: { fg: "var(--success)", bg: "var(--success-soft)", label: "Delivered" },
   read: { fg: "var(--success)", bg: "var(--success-soft)", label: "Read" },
   failed: { fg: "var(--danger)", bg: "var(--danger-soft)", label: "Failed" },

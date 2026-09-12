@@ -1,6 +1,12 @@
 import { ArrowDown } from "lucide-react";
 
-export function JumpToLatestButton({ onClick, accent = "var(--indigo)" }: { onClick: () => void; accent?: string }) {
+export function JumpToLatestButton({
+  onClick,
+  accent = "var(--whatsapp-strong)",
+}: {
+  onClick: () => void;
+  accent?: string;
+}) {
   return (
     <button
       onClick={onClick}

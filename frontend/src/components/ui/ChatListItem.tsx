@@ -7,8 +7,8 @@ export function ChatListItem({
   chat,
   isActive,
   onClick,
-  accent = "var(--indigo)",
-  activeBg = "var(--indigo-soft)",
+  accent = "var(--whatsapp-strong)",
+  activeBg = "var(--whatsapp-soft)",
   secondaryLine,
 }: {
   chat: ChatRow;

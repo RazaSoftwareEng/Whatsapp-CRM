@@ -13,6 +13,11 @@
   --teal-soft: #e6f5f3;
   --teal-strong: #0b7d72;
 
+  /* Official WhatsApp brand green — used for chat accents instead of blue/indigo. */
+  --whatsapp: #25d366;
+  --whatsapp-soft: #e3f9ec;
+  --whatsapp-strong: #1da851;
+
   --indigo: #4f46e5;
   --indigo-soft: #ecebfd;
   --indigo-strong: #4338ca;
