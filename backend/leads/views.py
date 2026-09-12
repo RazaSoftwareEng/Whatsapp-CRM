@@ -169,13 +169,17 @@ class ChatViewSet(viewsets.ModelViewSet):
             body=template_body,
             delivery_status=Message.DeliveryStatus.PENDING,
         )
+        print(f"[start_with_template] to={lead.phone_number!r} name={template_name!r} "
+              f"lang={settings.WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE!r}", flush=True)
         try:
             result = send_whatsapp_template(
                 lead.phone_number, template_name, settings.WHATSAPP_FIRST_CONTACT_TEMPLATE_LANGUAGE
             )
             message.wa_message_id = result.get("messages", [{}])[0].get("id", "")
             message.delivery_status = Message.DeliveryStatus.SENT
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            body = exc.response.text if exc.response is not None else str(exc)
+            print(f"[start_with_template] FAILED: {body}", flush=True)
             message.delivery_status = Message.DeliveryStatus.FAILED
         message.save(update_fields=["wa_message_id", "delivery_status"])
 
