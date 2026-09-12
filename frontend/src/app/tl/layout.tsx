@@ -3,10 +3,11 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, LogOut, MessageCircle } from "lucide-react";
+import { LayoutDashboard, LogOut, MessageCircle, UserPlus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { CopyGuard } from "@/components/CopyGuard";
 import { Logo } from "@/components/ui/Logo";
+import { NewChatProvider, useNewChatRequest } from "@/context/NewChatContext";
 
 const NAV_ITEMS = [
   { href: "/tl", label: "Dashboard", icon: LayoutDashboard },
@@ -14,9 +15,18 @@ const NAV_ITEMS = [
 ];
 
 export default function TLLayout({ children }: { children: ReactNode }) {
+  return (
+    <NewChatProvider>
+      <TLLayoutInner>{children}</TLLayoutInner>
+    </NewChatProvider>
+  );
+}
+
+function TLLayoutInner({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { requestNewChat } = useNewChatRequest();
 
   useEffect(() => {
     if (loading) return;
@@ -25,6 +35,11 @@ export default function TLLayout({ children }: { children: ReactNode }) {
   }, [loading, user, router]);
 
   if (loading || !user || user.role !== "tl") return null;
+
+  function startNewChat() {
+    requestNewChat();
+    if (pathname !== "/tl/chats") router.push("/tl/chats");
+  }
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg)" }}>
@@ -47,6 +62,15 @@ export default function TLLayout({ children }: { children: ReactNode }) {
             </p>
           </div>
         </div>
+
+        <button
+          onClick={startNewChat}
+          className="mb-3 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          style={{ background: "linear-gradient(135deg, var(--teal), var(--indigo))" }}
+        >
+          <UserPlus size={15} />
+          New chat
+        </button>
 
         <nav className="flex flex-1 flex-col gap-1">
           {NAV_ITEMS.map((item) => {

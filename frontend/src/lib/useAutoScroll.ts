@@ -46,9 +46,8 @@ export function useAutoScroll(messageCount: number, activeId: number | string | 
     if (isNearBottom()) {
       requestAnimationFrame(() => scrollToBottom(true));
     } else {
-      setShowJump(true);
+      requestAnimationFrame(() => setShowJump(true));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messageCount, activeId]);
 
   function onScroll() {

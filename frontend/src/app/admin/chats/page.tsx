@@ -1,15 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SubmitEvent } from "react";
-import { Send, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
+import { MessageCircle, Send, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
-import { StatusPill } from "@/components/ui/StatusPill";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
 import { formatTime } from "@/lib/format";
 import { MessageContent } from "@/components/ui/MessageContent";
 import { JumpToLatestButton } from "@/components/ui/JumpToLatestButton";
+import { ChatListControls, type ChatTab } from "@/components/ui/ChatListControls";
+import { ChatListItem } from "@/components/ui/ChatListItem";
+import { DateDivider } from "@/components/ui/DateDivider";
+import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
+import { ChatComposerInput } from "@/components/ui/ChatComposerInput";
 import { useAutoScroll } from "@/lib/useAutoScroll";
+import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatRow, ChatDetail } from "@/types/admin";
 
 export default function AdminChatsPage() {
@@ -19,6 +24,8 @@ export default function AdminChatsPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<ChatTab>("all");
   const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
     activeChat?.messages.length ?? 0,
     activeId
@@ -45,10 +52,39 @@ export default function AdminChatsPage() {
     if (activeId === null) return;
     loadActive(activeId);
     const t = setInterval(() => loadActive(activeId), 4000);
-    setChats((prev) => prev.map((c) => (c.id === activeId ? { ...c, has_unread: false } : c)));
-    api.post(`/chats/${activeId}/mark_read/`).catch(() => {});
+    api
+      .post(`/chats/${activeId}/mark_read/`)
+      .then(() => setChats((prev) => prev.map((c) => (c.id === activeId ? { ...c, has_unread: false, unread_count: 0 } : c))))
+      .catch(() => {});
     return () => clearInterval(t);
   }, [activeId, loadActive]);
+
+  const counts = useMemo(
+    () => ({
+      all: chats.length,
+      assigned: chats.filter((c) => c.assigned_user).length,
+      unassigned: chats.filter((c) => !c.assigned_user).length,
+    }),
+    [chats]
+  );
+
+  const filteredChats = useMemo(() => {
+    let list = chats;
+    if (tab === "assigned") list = list.filter((c) => c.assigned_user);
+    if (tab === "unassigned") list = list.filter((c) => !c.assigned_user);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (c) =>
+          (c.lead.name || "").toLowerCase().includes(q) ||
+          c.lead.phone_number.toLowerCase().includes(q) ||
+          (c.last_message_body || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [chats, tab, search]);
+
+  const messageFeed = useMemo(() => groupMessagesByDay(activeChat?.messages ?? []), [activeChat?.messages]);
 
   function selectChat(id: number) {
     setActiveId(id);
@@ -95,47 +131,29 @@ export default function AdminChatsPage() {
         style={{
           background: "var(--surface)",
           borderColor: "var(--border)",
-          boxShadow: "var(--shadow-sm)",
+          boxShadow: "var(--shadow-md)",
           height: "calc(100vh - 260px)",
           minHeight: 420,
         }}
       >
-        <div className="flex w-72 shrink-0 flex-col overflow-y-auto border-r" style={{ borderColor: "var(--border)" }}>
-          {chats.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              No chats yet.
-            </p>
-          )}
-          {chats.map((chat) => {
-            const name = chat.lead.name || chat.lead.phone_number;
-            const isActive = activeId === chat.id;
-            return (
-              <button
+        <div className="flex w-80 shrink-0 flex-col border-r" style={{ borderColor: "var(--border)" }}>
+          <ChatListControls search={search} onSearchChange={setSearch} tab={tab} onTabChange={setTab} counts={counts} />
+          <div className="flex-1 overflow-y-auto">
+            {filteredChats.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                {chats.length === 0 ? "No chats yet." : "No chats match this filter."}
+              </p>
+            )}
+            {filteredChats.map((chat) => (
+              <ChatListItem
                 key={chat.id}
+                chat={chat}
+                isActive={activeId === chat.id}
                 onClick={() => selectChat(chat.id)}
-                className="flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
-                style={{ background: isActive ? "var(--indigo-soft)" : "transparent" }}
-              >
-                <Avatar name={name} size={36} />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1.5 truncate text-sm font-medium" style={{ color: "var(--text)" }}>
-                    {chat.has_unread && (
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: "var(--indigo)" }}
-                        title="New message"
-                      />
-                    )}
-                    <span className="truncate">{name}</span>
-                  </p>
-                  <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
-                    {chat.assigned_user_username ?? "Unassigned"}
-                  </p>
-                </div>
-                <StatusPill status={chat.status} />
-              </button>
-            );
-          })}
+                secondaryLine={chat.assigned_user_username ?? "Unassigned"}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col">
@@ -146,20 +164,29 @@ export default function AdminChatsPage() {
           ) : (
             <>
               <div
-                className="flex items-center gap-3 border-b px-5 py-3"
+                className="flex items-start gap-3 border-b px-5 py-3.5"
                 style={{ borderColor: "var(--border)" }}
               >
-                <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={34} />
+                <div className="relative shrink-0">
+                  <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={38} />
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2"
+                    style={{ background: "var(--teal-strong)", borderColor: "var(--surface)" }}
+                    title="WhatsApp"
+                  >
+                    <MessageCircle size={9} color="white" strokeWidth={2.5} />
+                  </span>
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                  <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
                     {activeChat.lead.name || activeChat.lead.phone_number}
                   </p>
                   <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
                     {activeChat.lead.phone_number}
                     {activeChat.assigned_user_username ? ` · assigned to ${activeChat.assigned_user_username}` : ""}
                   </p>
+                  <ChatHeaderTags status={activeChat.status} tags={activeChat.lead.tags} />
                 </div>
-                <StatusPill status={activeChat.status} />
                 <button
                   onClick={deleteChat}
                   disabled={deleting}
@@ -172,43 +199,50 @@ export default function AdminChatsPage() {
               </div>
 
               <div className="relative flex-1 overflow-hidden">
-              <div
-                ref={containerRef}
-                onScroll={onScroll}
-                className="h-full space-y-2.5 overflow-y-auto px-5 py-4"
-                style={{
-                  background:
-                    "radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/18px 18px, var(--bg)",
-                }}
-              >
-                {activeChat.messages.length === 0 && (
-                  <p className="text-center text-sm" style={{ color: "var(--text-faint)" }}>
-                    No messages yet.
-                  </p>
-                )}
-                {activeChat.messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className="max-w-sm rounded-2xl px-3.5 py-2.5 text-sm"
-                      style={
-                        m.direction === "out"
-                          ? { background: "linear-gradient(135deg, var(--indigo), var(--indigo-strong))", color: "white" }
-                          : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-sm)" }
-                      }
-                    >
-                      <MessageContent body={m.body} mediaUrl={m.media_url} />
+                <div
+                  ref={containerRef}
+                  onScroll={onScroll}
+                  className="h-full space-y-1.5 overflow-y-auto px-5 py-3"
+                  style={{ background: "var(--bg)" }}
+                >
+                  {messageFeed.length === 0 && (
+                    <p className="text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                      No messages yet.
+                    </p>
+                  )}
+                  {messageFeed.map((item) =>
+                    item.kind === "divider" ? (
+                      <DateDivider key={`divider-${item.label}`} label={item.label} />
+                    ) : (
                       <div
-                        className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
-                        style={m.direction === "in" ? { color: "var(--text-faint)" } : undefined}
+                        key={item.message.id}
+                        className={`flex items-end gap-1.5 ${item.message.direction === "out" ? "justify-end" : "justify-start"}`}
                       >
-                        {formatTime(m.sent_at)}
-                        {m.direction === "out" && <DeliveryIcon status={m.delivery_status} />}
+                        {item.message.direction === "in" && (
+                          <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={26} />
+                        )}
+                        <div
+                          className="max-w-sm rounded-2xl px-3.5 py-2.5 text-sm"
+                          style={
+                            item.message.direction === "out"
+                              ? { background: "var(--teal-strong)", color: "white" }
+                              : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-md)" }
+                          }
+                        >
+                          <MessageContent body={item.message.body} mediaUrl={item.message.media_url} />
+                          <div
+                            className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
+                            style={item.message.direction === "in" ? { color: "var(--text-faint)" } : undefined}
+                          >
+                            {formatTime(item.message.sent_at)}
+                            {item.message.direction === "out" && <DeliveryIcon status={item.message.delivery_status} />}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} />}
+                    )
+                  )}
+                </div>
+                {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} />}
               </div>
 
               <form
@@ -216,18 +250,17 @@ export default function AdminChatsPage() {
                 className="flex gap-2 border-t px-4 py-3"
                 style={{ borderColor: "var(--border)" }}
               >
-                <input
+                <ChatComposerInput
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={setDraft}
                   placeholder="Reply as admin…"
-                  className="flex-1 rounded-full border px-4 py-2.5 text-sm outline-none focus:border-[var(--indigo)]"
-                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+                  focusColor="var(--teal)"
                 />
                 <button
                   type="submit"
                   disabled={sending || !draft.trim()}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg, var(--indigo), var(--teal))" }}
+                  style={{ background: "var(--teal-strong)" }}
                 >
                   <Send size={16} />
                 </button>

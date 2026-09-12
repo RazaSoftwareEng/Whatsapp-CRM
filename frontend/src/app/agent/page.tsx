@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SubmitEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Send } from "lucide-react";
+import { LogOut, MessageCircle, Search, Send } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,7 +13,12 @@ import { NewContactForm } from "@/components/NewContactForm";
 import { formatTime } from "@/lib/format";
 import { MessageContent } from "@/components/ui/MessageContent";
 import { JumpToLatestButton } from "@/components/ui/JumpToLatestButton";
+import { ChatListItem } from "@/components/ui/ChatListItem";
+import { DateDivider } from "@/components/ui/DateDivider";
+import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
+import { ChatComposerInput } from "@/components/ui/ChatComposerInput";
 import { useAutoScroll } from "@/lib/useAutoScroll";
+import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatDetail, ChatRow as ChatSummary } from "@/types/admin";
 
 export default function AgentPage() {
@@ -24,6 +29,7 @@ export default function AgentPage() {
   const [activeChat, setActiveChat] = useState<ChatDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [search, setSearch] = useState("");
   const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
     activeChat?.messages.length ?? 0,
     activeId
@@ -55,6 +61,19 @@ export default function AgentPage() {
     return () => clearInterval(t);
   }, [activeId, loadActive]);
 
+  const filteredChats = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return chats;
+    return chats.filter(
+      (c) =>
+        (c.lead.name || "").toLowerCase().includes(q) ||
+        c.lead.phone_number.toLowerCase().includes(q) ||
+        (c.last_message_body || "").toLowerCase().includes(q)
+    );
+  }, [chats, search]);
+
+  const messageFeed = useMemo(() => groupMessagesByDay(activeChat?.messages ?? []), [activeChat?.messages]);
+
   async function sendReply(e: SubmitEvent) {
     e.preventDefault();
     if (!activeId || !draft.trim()) return;
@@ -74,7 +93,7 @@ export default function AgentPage() {
     <div className="flex h-screen" style={{ background: "var(--bg)" }}>
       <CopyGuard />
       <aside
-        className="flex w-80 shrink-0 flex-col overflow-y-auto border-r"
+        className="flex w-80 shrink-0 flex-col border-r"
         style={{ borderColor: "var(--border)", background: "var(--surface)" }}
       >
         <div className="flex items-center justify-between border-b px-4 py-4" style={{ borderColor: "var(--border)" }}>
@@ -102,6 +121,21 @@ export default function AgentPage() {
           </button>
         </div>
 
+        <div className="relative px-3 pt-3">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-6 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--text-faint)" }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search chats…"
+            className="w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
+            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
+          />
+        </div>
+
         <NewContactForm
           onCreated={(chat) => {
             setChats((prev) => [chat, ...prev.filter((c) => c.id !== chat.id)]);
@@ -109,35 +143,22 @@ export default function AgentPage() {
           }}
         />
 
-        {chats.length === 0 && (
-          <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-            No chats assigned yet.
-          </p>
-        )}
-
-        <div className="flex flex-col gap-1 p-2">
-          {chats.map((chat) => {
-            const name = chat.lead.name || chat.lead.phone_number;
-            const isActive = activeId === chat.id;
-            return (
-              <button
-                key={chat.id}
-                onClick={() => setActiveId(chat.id)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                style={{ background: isActive ? "var(--teal-soft)" : "transparent" }}
-              >
-                <Avatar name={name} size={38} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
-                    {name}
-                  </p>
-                  <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
-                    {chat.lead.phone_number}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex-1 overflow-y-auto">
+          {filteredChats.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+              {chats.length === 0 ? "No chats assigned yet." : "No chats match your search."}
+            </p>
+          )}
+          {filteredChats.map((chat) => (
+            <ChatListItem
+              key={chat.id}
+              chat={chat}
+              isActive={activeId === chat.id}
+              onClick={() => setActiveId(chat.id)}
+              accent="var(--teal-strong)"
+              activeBg="var(--teal-soft)"
+            />
+          ))}
         </div>
       </aside>
 
@@ -152,58 +173,75 @@ export default function AgentPage() {
         ) : (
           <>
             <div
-              className="flex items-center gap-3 border-b px-6 py-3.5"
+              className="flex items-start gap-3 border-b px-6 py-3.5"
               style={{ borderColor: "var(--border)", background: "var(--surface)" }}
             >
-              <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={36} />
-              <div>
-                <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+              <div className="relative shrink-0">
+                <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={38} />
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2"
+                  style={{ background: "var(--teal-strong)", borderColor: "var(--surface)" }}
+                  title="WhatsApp"
+                >
+                  <MessageCircle size={9} color="white" strokeWidth={2.5} />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
                   {activeChat.lead.name || activeChat.lead.phone_number}
                 </p>
-                <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
                   {activeChat.lead.phone_number}
                 </p>
+                <ChatHeaderTags status={activeChat.status} tags={activeChat.lead.tags} />
               </div>
             </div>
 
             <div className="relative flex-1 overflow-hidden">
-            <div
-              ref={containerRef}
-              onScroll={onScroll}
-              className="h-full space-y-2.5 overflow-y-auto px-6 py-5"
-              style={{
-                background:
-                  "radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0) 0 0/18px 18px, var(--bg)",
-              }}
-            >
-              {activeChat.messages.length === 0 && (
-                <p className="text-center text-sm" style={{ color: "var(--text-faint)" }}>
-                  No messages yet.
-                </p>
-              )}
-              {activeChat.messages.map((m) => (
-                <div key={m.id} className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className="max-w-sm rounded-2xl px-3.5 py-2.5 text-sm"
-                    style={
-                      m.direction === "out"
-                        ? { background: "linear-gradient(135deg, var(--teal), var(--teal-strong))", color: "white" }
-                        : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-sm)" }
-                    }
-                  >
-                    <MessageContent body={m.body} mediaUrl={m.media_url} />
+              <div
+                ref={containerRef}
+                onScroll={onScroll}
+                className="h-full space-y-1.5 overflow-y-auto px-6 py-3"
+                style={{ background: "var(--bg)" }}
+              >
+                {messageFeed.length === 0 && (
+                  <p className="text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                    No messages yet.
+                  </p>
+                )}
+                {messageFeed.map((item) =>
+                  item.kind === "divider" ? (
+                    <DateDivider key={`divider-${item.label}`} label={item.label} />
+                  ) : (
                     <div
-                      className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
-                      style={m.direction === "in" ? { color: "var(--text-faint)" } : undefined}
+                      key={item.message.id}
+                      className={`flex items-end gap-1.5 ${item.message.direction === "out" ? "justify-end" : "justify-start"}`}
                     >
-                      {formatTime(m.sent_at)}
-                      {m.direction === "out" && <DeliveryIcon status={m.delivery_status} />}
+                      {item.message.direction === "in" && (
+                        <Avatar name={activeChat.lead.name || activeChat.lead.phone_number} size={26} />
+                      )}
+                      <div
+                        className="max-w-sm rounded-2xl px-3.5 py-2.5 text-sm"
+                        style={
+                          item.message.direction === "out"
+                            ? { background: "var(--teal-strong)", color: "white" }
+                            : { background: "var(--surface)", color: "var(--text)", boxShadow: "var(--shadow-md)" }
+                        }
+                      >
+                        <MessageContent body={item.message.body} mediaUrl={item.message.media_url} />
+                        <div
+                          className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80"
+                          style={item.message.direction === "in" ? { color: "var(--text-faint)" } : undefined}
+                        >
+                          {formatTime(item.message.sent_at)}
+                          {item.message.direction === "out" && <DeliveryIcon status={item.message.delivery_status} />}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} accent="var(--teal-strong)" />}
+                  )
+                )}
+              </div>
+              {showJump && <JumpToLatestButton onClick={() => scrollToBottom(true)} accent="var(--teal-strong)" />}
             </div>
 
             <form
@@ -211,18 +249,12 @@ export default function AgentPage() {
               className="flex gap-2 border-t px-4 py-3.5"
               style={{ borderColor: "var(--border)", background: "var(--surface)" }}
             >
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type a reply…"
-                className="flex-1 rounded-full border px-4 py-2.5 text-sm outline-none focus:border-[var(--teal)]"
-                style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
-              />
+              <ChatComposerInput value={draft} onChange={setDraft} placeholder="Type a reply…" />
               <button
                 type="submit"
                 disabled={sending || !draft.trim()}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                style={{ background: "linear-gradient(135deg, var(--teal), var(--indigo))" }}
+                style={{ background: "var(--teal-strong)" }}
               >
                 <Send size={16} />
               </button>

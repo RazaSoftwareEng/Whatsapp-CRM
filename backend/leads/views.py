@@ -40,8 +40,10 @@ class ChatViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Chat.objects.select_related("lead", "assigned_user").order_by(
-            F("last_message_at").desc(nulls_last=True)
+        qs = (
+            Chat.objects.select_related("lead", "assigned_user")
+            .prefetch_related("lead__tags", "messages")
+            .order_by(F("last_message_at").desc(nulls_last=True))
         )
         if user.role in ("admin", "tl"):
             return qs

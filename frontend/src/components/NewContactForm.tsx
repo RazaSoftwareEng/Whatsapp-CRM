@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ChatRow, ClientStatus } from "@/types/admin";
@@ -19,11 +19,31 @@ const EMPTY = {
   client_status: "first_time" as ClientStatus,
 };
 
-/** Compact "add a new contact and start a chat" form used by the agent and team-lead views. */
-export function NewContactForm({ onCreated }: { onCreated: (chat: ChatRow) => void }) {
+/** Compact "add a new contact and start a chat" form used by the agent and team-lead views.
+ * `openSignal`, if given, pops the form open each time it changes — lets a button
+ * elsewhere (e.g. the persistent sidebar) trigger this without owning its state. */
+export function NewContactForm({
+  onCreated,
+  openSignal,
+  hideTrigger,
+}: {
+  onCreated: (chat: ChatRow) => void;
+  openSignal?: number;
+  /** Hide the built-in "New chat" toggle — use when an external button (e.g. the
+   * sidebar) drives `openSignal` instead, so there isn't a duplicate button. */
+  hideTrigger?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
+  const prevSignal = useRef(openSignal);
+
+  useEffect(() => {
+    if (openSignal !== undefined && openSignal !== prevSignal.current) {
+      prevSignal.current = openSignal;
+      setOpen(true);
+    }
+  }, [openSignal]);
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
@@ -41,14 +61,16 @@ export function NewContactForm({ onCreated }: { onCreated: (chat: ChatRow) => vo
 
   return (
     <div className="px-3 pt-3">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium transition-colors hover:opacity-80"
-        style={{ borderColor: "var(--border)", color: "var(--teal-strong)" }}
-      >
-        <UserPlus size={13} />
-        New chat
-      </button>
+      {!hideTrigger && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs font-medium transition-colors hover:opacity-80"
+          style={{ borderColor: "var(--border)", color: "var(--teal-strong)" }}
+        >
+          <UserPlus size={13} />
+          New chat
+        </button>
+      )}
       {open && (
         <form onSubmit={submit} className="mt-2 flex flex-col gap-1.5">
           <input

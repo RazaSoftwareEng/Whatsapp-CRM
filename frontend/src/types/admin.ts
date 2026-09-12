@@ -22,12 +22,15 @@ export type ChatRow = {
     email: string;
     phone_number: string;
     client_status: ClientStatus;
+    tags: { id: number; name: string }[];
   };
   assigned_user: number | null;
   assigned_user_username: string | null;
   status: string;
   last_message_at: string | null;
+  last_message_body: string;
   has_unread: boolean;
+  unread_count: number;
 };
 
 export type Message = {

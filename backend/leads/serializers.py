@@ -39,6 +39,8 @@ class ChatSerializer(serializers.ModelSerializer):
     lead_id = serializers.PrimaryKeyRelatedField(source="lead", queryset=Lead.objects.all(), write_only=True)
     assigned_user_username = serializers.CharField(source="assigned_user.username", read_only=True, default=None)
     has_unread = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    last_message_body = serializers.SerializerMethodField()
 
     class Meta:
         model = Chat
@@ -50,7 +52,9 @@ class ChatSerializer(serializers.ModelSerializer):
             "assigned_user_username",
             "status",
             "last_message_at",
+            "last_message_body",
             "has_unread",
+            "unread_count",
         ]
         read_only_fields = ["id", "assigned_user", "status", "last_message_at"]
 
@@ -58,6 +62,24 @@ class ChatSerializer(serializers.ModelSerializer):
         if not obj.last_message_at:
             return False
         return obj.last_read_at is None or obj.last_message_at > obj.last_read_at
+
+    def get_unread_count(self, obj):
+        if not obj.last_message_at:
+            return 0
+        qs = obj.messages.filter(direction="in")
+        if obj.last_read_at:
+            qs = qs.filter(sent_at__gt=obj.last_read_at)
+        return qs.count()
+
+    def get_last_message_body(self, obj):
+        last = obj.messages.last()
+        if not last:
+            return ""
+        if last.body:
+            return last.body
+        if last.media_url:
+            return "📎 Attachment"
+        return ""
 
 
 class ChatDetailSerializer(ChatSerializer):
