@@ -16,6 +16,12 @@ from .services import send_whatsapp_template, send_whatsapp_text
 MANAGER_LEAD_SOURCE = "manager"
 
 
+def _normalize_phone(raw: str) -> str:
+    """Strip everything but digits — WhatsApp's Cloud API rejects a "to" number
+    with spaces, dashes, or a leading "+" ("phone number is malformed")."""
+    return "".join(ch for ch in raw if ch.isdigit())
+
+
 class IsAdminOrTLOrOwnChat(permissions.BasePermission):
     """Admin: full access. TL: every chat except manager-started ones (those are
     private to the manager who started them, and admin). Agent/Manager: only
@@ -100,7 +106,7 @@ class ChatViewSet(viewsets.ModelViewSet):
     def _get_or_create_lead_and_chat(self, request, source):
         """Shared by start/start_with_template: upsert the Lead by phone number,
         then get-or-create its Chat and (re)claim it for the requesting user."""
-        phone_number = (request.data.get("phone_number") or "").strip()
+        phone_number = _normalize_phone(request.data.get("phone_number") or "")
         if not phone_number:
             return None, None, Response({"detail": "phone_number is required."}, status=400)
 
