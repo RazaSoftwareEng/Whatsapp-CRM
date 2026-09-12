@@ -122,5 +122,7 @@ class WhatsAppWebhookView(APIView):
         for status in value.get("statuses", []):
             wamid = status.get("id")
             new_status = status.get("status")
+            if new_status == "failed":
+                print(f"[status webhook] FAILED wamid={wamid} full_payload={status}", flush=True)
             if wamid and new_status in valid_statuses:
                 Message.objects.filter(wa_message_id=wamid).update(delivery_status=new_status)
