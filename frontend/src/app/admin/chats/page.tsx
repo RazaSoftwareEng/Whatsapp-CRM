@@ -14,6 +14,7 @@ import { DateDivider } from "@/components/ui/DateDivider";
 import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
 import { ChatComposerInput } from "@/components/ui/ChatComposerInput";
 import { useAutoScroll } from "@/lib/useAutoScroll";
+import { useAttachmentUpload } from "@/lib/useAttachmentUpload";
 import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatRow, ChatDetail } from "@/types/admin";
 
@@ -41,6 +42,8 @@ export default function AdminChatsPage() {
   const loadActive = useCallback((id: number) => {
     api.get<ChatDetail>(`/chats/${id}/`).then((res) => setActiveChat(res.data));
   }, []);
+
+  const { attaching, upload } = useAttachmentUpload(activeId, () => activeId && loadActive(activeId));
 
   useEffect(() => {
     loadChats();
@@ -255,6 +258,8 @@ export default function AdminChatsPage() {
                   onChange={setDraft}
                   placeholder="Reply as admin…"
                   focusColor="var(--teal)"
+                  onAttach={upload}
+                  attaching={attaching}
                 />
                 <button
                   type="submit"

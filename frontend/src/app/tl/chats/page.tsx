@@ -15,6 +15,7 @@ import { DateDivider } from "@/components/ui/DateDivider";
 import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
 import { ChatComposerInput } from "@/components/ui/ChatComposerInput";
 import { useAutoScroll } from "@/lib/useAutoScroll";
+import { useAttachmentUpload } from "@/lib/useAttachmentUpload";
 import { useNewChatRequest } from "@/context/NewChatContext";
 import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatRow, ChatDetail, UserRow } from "@/types/admin";
@@ -45,6 +46,8 @@ export default function TLChatsPage() {
   const loadActive = useCallback((id: number) => {
     api.get<ChatDetail>(`/chats/${id}/`).then((res) => setActiveChat(res.data));
   }, []);
+
+  const { attaching, upload } = useAttachmentUpload(activeId, () => activeId && loadActive(activeId));
 
   useEffect(() => {
     api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data));
@@ -277,7 +280,14 @@ export default function TLChatsPage() {
               </div>
 
               <form onSubmit={sendReply} className="flex gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border)" }}>
-                <ChatComposerInput value={draft} onChange={setDraft} placeholder="Reply as team lead…" />
+                <ChatComposerInput
+                  value={draft}
+                  onChange={setDraft}
+                  placeholder="Reply as team lead…"
+                  focusColor="var(--teal)"
+                  onAttach={upload}
+                  attaching={attaching}
+                />
                 <button
                   type="submit"
                   disabled={sending || !draft.trim()}

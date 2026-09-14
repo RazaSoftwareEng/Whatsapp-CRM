@@ -1,9 +1,15 @@
+import mimetypes
+import uuid
+
 import requests
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db.models import F
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from accounts.models import User
@@ -11,7 +17,9 @@ from accounts.permissions import IsAdmin, IsManager, IsTL
 
 from .models import Chat, Lead, Message, Tag
 from .serializers import ChatDetailSerializer, ChatSerializer, LeadSerializer, MessageSerializer, TagSerializer
-from .services import send_whatsapp_template, send_whatsapp_text
+from .services import send_whatsapp_media, send_whatsapp_template, send_whatsapp_text
+
+MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024  # Meta's own document cap; images/video are capped lower on their side too
 
 MANAGER_LEAD_SOURCE = "manager"
 
@@ -214,3 +222,56 @@ class MessageViewSet(viewsets.ModelViewSet):
         except requests.RequestException:
             message.delivery_status = Message.DeliveryStatus.FAILED
         message.save(update_fields=["wa_message_id", "delivery_status"])
+
+    @action(detail=False, methods=["post"], parser_classes=[MultiPartParser, FormParser])
+    def send_media(self, request):
+        """Upload a file (image/video/document) and send it to this chat's lead.
+
+        We re-host the file under our own /media/ URL and pass that link to the
+        Cloud API rather than uploading bytes to Meta first — same approach as
+        the outbound template flow, and it reuses the storage we already serve
+        inbound media from.
+        """
+        chat = get_object_or_404(Chat.objects.select_related("lead"), pk=request.data.get("chat"))
+        if not IsAdminOrTLOrOwnChat().has_object_permission(request, self, chat):
+            return Response({"detail": "You do not have access to this chat."}, status=403)
+
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "file is required."}, status=400)
+        if upload.size > MAX_ATTACHMENT_BYTES:
+            return Response({"detail": "File is too large (100MB max)."}, status=400)
+
+        content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
+        if content_type.startswith("image/"):
+            media_type = "image"
+        elif content_type.startswith("video/"):
+            media_type = "video"
+        elif content_type.startswith("audio/"):
+            media_type = "audio"
+        else:
+            media_type = "document"
+
+        ext = mimetypes.guess_extension(content_type.split(";")[0].strip()) or ""
+        saved_path = default_storage.save(f"whatsapp/{uuid.uuid4().hex}{ext}", upload)
+        media_url = request.build_absolute_uri(default_storage.url(saved_path))
+        caption = (request.data.get("caption") or "").strip()
+
+        message = Message.objects.create(
+            chat=chat,
+            direction=Message.Direction.OUT,
+            body=caption,
+            media_url=media_url,
+            delivery_status=Message.DeliveryStatus.PENDING,
+        )
+        try:
+            result = send_whatsapp_media(chat.lead.phone_number, media_type, media_url, caption, upload.name)
+            message.wa_message_id = result.get("messages", [{}])[0].get("id", "")
+            message.delivery_status = Message.DeliveryStatus.SENT
+        except requests.RequestException:
+            message.delivery_status = Message.DeliveryStatus.FAILED
+        message.save(update_fields=["wa_message_id", "delivery_status"])
+
+        chat.last_message_at = timezone.now()
+        chat.save(update_fields=["last_message_at"])
+        return Response(MessageSerializer(message).data, status=201)

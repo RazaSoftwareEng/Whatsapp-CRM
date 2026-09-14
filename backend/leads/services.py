@@ -46,6 +46,33 @@ def send_whatsapp_text(to: str, body: str) -> dict:
     return response.json()
 
 
+def send_whatsapp_media(to: str, media_type: str, link: str, caption: str = "", filename: str = "") -> dict:
+    """Send an image/video/audio/document via the Cloud API, referencing it by a
+    publicly-reachable URL (our own /media/ host) rather than uploading bytes to
+    Meta first — simpler, and reuses the same storage we already serve inbound
+    media from. `media_type` must be one of: image, video, audio, document.
+    """
+    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {settings.WHATSAPP_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    media_object = {"link": link}
+    if caption and media_type in ("image", "video", "document"):
+        media_object["caption"] = caption
+    if filename and media_type == "document":
+        media_object["filename"] = filename
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": media_type,
+        media_type: media_object,
+    }
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+
 def send_whatsapp_template(to: str, template_name: str, language_code: str) -> dict:
     """Send an approved WhatsApp template message — the only way to message a
     contact who hasn't messaged us first (see send_whatsapp_text's docstring).

@@ -18,6 +18,7 @@ import { DateDivider } from "@/components/ui/DateDivider";
 import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
 import { ChatComposerInput } from "@/components/ui/ChatComposerInput";
 import { useAutoScroll } from "@/lib/useAutoScroll";
+import { useAttachmentUpload } from "@/lib/useAttachmentUpload";
 import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatDetail, ChatRow as ChatSummary } from "@/types/admin";
 
@@ -46,6 +47,8 @@ export default function AgentPage() {
   const loadActive = useCallback((id: number) => {
     api.get<ChatDetail>(`/chats/${id}/`).then((res) => setActiveChat(res.data));
   }, []);
+
+  const { attaching, upload } = useAttachmentUpload(activeId, () => activeId && loadActive(activeId));
 
   useEffect(() => {
     if (!user) return;
@@ -249,7 +252,13 @@ export default function AgentPage() {
               className="flex gap-2 border-t px-4 py-3.5"
               style={{ borderColor: "var(--border)", background: "var(--surface)" }}
             >
-              <ChatComposerInput value={draft} onChange={setDraft} placeholder="Type a reply…" />
+              <ChatComposerInput
+                value={draft}
+                onChange={setDraft}
+                placeholder="Type a reply…"
+                onAttach={upload}
+                attaching={attaching}
+              />
               <button
                 type="submit"
                 disabled={sending || !draft.trim()}
