@@ -1,8 +1,10 @@
 import mimetypes
+import subprocess
 import uuid
 
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db.models import F
 from django.shortcuts import get_object_or_404
@@ -15,6 +17,7 @@ from rest_framework.response import Response
 from accounts.models import User
 from accounts.permissions import IsAdmin, IsManager, IsTL
 
+from .media_utils import guess_media_extension, transcode_webm_to_ogg
 from .models import Chat, Lead, Message, Tag
 from .serializers import ChatDetailSerializer, ChatSerializer, LeadSerializer, MessageSerializer, TagSerializer
 from .services import send_whatsapp_media, send_whatsapp_template, send_whatsapp_text
@@ -243,6 +246,19 @@ class MessageViewSet(viewsets.ModelViewSet):
             return Response({"detail": "File is too large (100MB max)."}, status=400)
 
         content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
+        file_bytes = upload.read()
+        filename = upload.name
+
+        # Browser voice-note recordings arrive as audio/webm — WhatsApp's Cloud API
+        # doesn't accept that container, only Opus-in-Ogg, so remux it first.
+        if content_type in ("audio/webm", "video/webm") or filename.lower().endswith(".webm"):
+            try:
+                file_bytes = transcode_webm_to_ogg(file_bytes)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+                return Response({"detail": "Could not process this voice note."}, status=400)
+            content_type = "audio/ogg"
+            filename = "voice-note.ogg"
+
         if content_type.startswith("image/"):
             media_type = "image"
         elif content_type.startswith("video/"):
@@ -252,8 +268,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         else:
             media_type = "document"
 
-        ext = mimetypes.guess_extension(content_type.split(";")[0].strip()) or ""
-        saved_path = default_storage.save(f"whatsapp/{uuid.uuid4().hex}{ext}", upload)
+        ext = guess_media_extension(content_type)
+        saved_path = default_storage.save(f"whatsapp/{uuid.uuid4().hex}{ext}", ContentFile(file_bytes))
         media_url = request.build_absolute_uri(default_storage.url(saved_path))
         caption = (request.data.get("caption") or "").strip()
 
@@ -265,7 +281,7 @@ class MessageViewSet(viewsets.ModelViewSet):
             delivery_status=Message.DeliveryStatus.PENDING,
         )
         try:
-            result = send_whatsapp_media(chat.lead.phone_number, media_type, media_url, caption, upload.name)
+            result = send_whatsapp_media(chat.lead.phone_number, media_type, media_url, caption, filename)
             message.wa_message_id = result.get("messages", [{}])[0].get("id", "")
             message.delivery_status = Message.DeliveryStatus.SENT
         except requests.RequestException:

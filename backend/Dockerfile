@@ -39,9 +39,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Gunicorn will write to stdout/stderr (captured by Docker)
     PYTHONFAULTHANDLER=1
 
-# Runtime-only OS libraries (libpq for psycopg at runtime)
+# Runtime-only OS libraries (libpq for psycopg at runtime; ffmpeg to remux
+# browser-recorded voice notes from webm into the Opus/Ogg WhatsApp requires)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pre-built wheels from builder — no compiler needed here

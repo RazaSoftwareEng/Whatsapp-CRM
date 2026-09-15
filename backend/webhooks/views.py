@@ -1,4 +1,3 @@
-import mimetypes
 import uuid
 
 from django.conf import settings
@@ -10,6 +9,7 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from leads.media_utils import guess_media_extension
 from leads.models import Chat, Lead, Message
 from leads.services import download_whatsapp_media
 
@@ -19,25 +19,6 @@ MEDIA_TYPE_LABELS = {
     "audio": "Audio",
     "document": "Document",
     "sticker": "Sticker",
-}
-
-# Python's mimetypes module doesn't know several types WhatsApp actually sends
-# (voice notes are "audio/ogg", for example) — without an extension the saved
-# file has none, so the frontend can't tell it's playable audio/video and just
-# renders a plain download link. Override with WhatsApp's known types first.
-MIME_EXTENSIONS = {
-    "audio/ogg": ".ogg",
-    "audio/opus": ".ogg",
-    "audio/aac": ".aac",
-    "audio/mp4": ".m4a",
-    "audio/mpeg": ".mp3",
-    "audio/amr": ".amr",
-    "video/mp4": ".mp4",
-    "video/3gpp": ".3gp",
-    "image/webp": ".webp",
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "application/pdf": ".pdf",
 }
 
 
@@ -131,8 +112,7 @@ class WhatsAppWebhookView(APIView):
         if not result:
             return ""
         content, mime_type = result
-        clean_mime = mime_type.split(";")[0].strip()
-        ext = MIME_EXTENSIONS.get(clean_mime) or mimetypes.guess_extension(clean_mime) or ""
+        ext = guess_media_extension(mime_type)
         filename = f"whatsapp/{uuid.uuid4().hex}{ext}"
         saved_path = default_storage.save(filename, ContentFile(content))
         return self.request.build_absolute_uri(default_storage.url(saved_path))
