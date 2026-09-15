@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import { api } from "@/lib/api";
 
 /** Uploads a file to the active chat via /messages/send_media/, then lets the
@@ -15,8 +16,9 @@ export function useAttachmentUpload(chatId: number | null, onSent: () => void) {
     try {
       await api.post("/messages/send_media/", formData);
       onSent();
-    } catch {
-      alert("Could not send this attachment.");
+    } catch (err) {
+      const detail = isAxiosError(err) ? err.response?.data?.detail : undefined;
+      alert(detail || "Could not send this attachment.");
     } finally {
       setAttaching(false);
     }
