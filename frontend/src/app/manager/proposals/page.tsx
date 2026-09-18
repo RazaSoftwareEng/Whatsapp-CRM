@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -18,8 +19,17 @@ const STATUS_OPTIONS: { value: ProposalStatus | ""; label: string }[] = [
 ];
 
 export default function ManagerProposalsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ManagerProposalsPageInner />
+    </Suspense>
+  );
+}
+
+function ManagerProposalsPageInner() {
+  const searchParams = useSearchParams();
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "">("");
 
   const loadProposals = useCallback(() => {

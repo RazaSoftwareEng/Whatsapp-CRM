@@ -1,17 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { api } from "@/lib/api";
+import { Avatar } from "@/components/ui/Avatar";
+import { CopyField } from "@/components/ui/CopyField";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { CompanyRow } from "@/types/companies";
 
 export default function ManagerCompaniesPage() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const load = useCallback(() => {
-    api.get<CompanyRow[]>("/companies/").then((res) => setCompanies(res.data));
+    api.get<CompanyRow[]>("/companies/").then((res) => {
+      setCompanies(res.data);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -35,19 +43,26 @@ export default function ManagerCompaniesPage() {
         Every company registered across all proposals — shared with every Manager.
       </p>
 
-      <div className="relative mb-4 max-w-sm">
-        <Search
-          size={15}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-          style={{ color: "var(--text-faint)" }}
-        />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email"
-          className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none focus:border-[var(--orange)]"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text)" }}
-        />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--text-faint)" }}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email"
+            className="w-full rounded-full border py-2 pl-9 pr-3 text-sm outline-none focus:border-[var(--orange)]"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text)" }}
+          />
+        </div>
+        {!loading && (
+          <p className="shrink-0 text-xs" style={{ color: "var(--text-faint)" }}>
+            {filtered.length} {filtered.length === 1 ? "company" : "companies"}
+          </p>
+        )}
       </div>
 
       <div
@@ -75,32 +90,52 @@ export default function ManagerCompaniesPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
                   No companies found.
                 </td>
               </tr>
             )}
-            {filtered.map((c) => (
-              <tr key={c.id} style={{ borderTop: "1px solid var(--border)" }}>
-                <td className="px-4 py-3 font-medium" style={{ color: "var(--text)" }}>
-                  {c.company_name}
-                </td>
-                <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>
-                  {c.contact_person || "—"}
-                </td>
-                <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>
-                  {c.email}
-                </td>
-                <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>
-                  {c.phone || "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <StatusPill status={c.status ?? "active"} />
-                </td>
-              </tr>
-            ))}
+            {!loading &&
+              filtered.map((c) => (
+                <tr
+                  key={c.id}
+                  onClick={() => router.push(`/manager/proposals?q=${encodeURIComponent(c.company_name)}`)}
+                  className="cursor-pointer transition-colors hover:opacity-90"
+                  style={{ borderTop: "1px solid var(--border)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar name={c.company_name} size={28} />
+                      <span className="truncate font-medium" style={{ color: "var(--text)" }}>
+                        {c.company_name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>
+                    {c.contact_person || "—"}
+                  </td>
+                  <td className="max-w-[200px] px-4 py-3" style={{ color: "var(--text-muted)" }}>
+                    <CopyField value={c.email} />
+                  </td>
+                  <td className="px-4 py-3" style={{ color: "var(--text-muted)" }}>
+                    <CopyField value={c.phone || ""} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={c.status ?? "active"} />
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>

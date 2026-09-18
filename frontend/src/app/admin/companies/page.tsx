@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState, type SubmitEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { isValidUaePkPhone } from "@/lib/phone";
+import { Avatar } from "@/components/ui/Avatar";
+import { CopyField } from "@/components/ui/CopyField";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { CompanyRow, CompanyStatus } from "@/types/companies";
@@ -11,7 +14,9 @@ import type { CompanyRow, CompanyStatus } from "@/types/companies";
 const emptyCompany = { company_name: "", contact_person: "", email: "", phone: "", status: "active" as CompanyStatus };
 
 export default function AdminCompaniesPage() {
+  const router = useRouter();
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newCompany, setNewCompany] = useState(emptyCompany);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
@@ -19,7 +24,10 @@ export default function AdminCompaniesPage() {
   const [rowError, setRowError] = useState<{ id: number; message: string } | null>(null);
 
   const load = useCallback(() => {
-    api.get<CompanyRow[]>("/companies/").then((res) => setCompanies(res.data));
+    api.get<CompanyRow[]>("/companies/").then((res) => {
+      setCompanies(res.data);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -71,46 +79,67 @@ export default function AdminCompaniesPage() {
       </p>
 
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <div
-          className="overflow-hidden rounded-2xl border"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
-        >
-          {companies.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              No companies yet.
-            </p>
-          )}
-          {companies.map((c, i) => (
-            <div key={c.id} className="px-4 py-3" style={i > 0 ? { borderTop: "1px solid var(--border)" } : undefined}>
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
-                    {c.company_name}
-                  </p>
-                  <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
-                    {c.contact_person ? `${c.contact_person} · ` : ""}
-                    {c.email}
-                    {c.phone ? ` · ${c.phone}` : ""}
-                  </p>
+        <div>
+          <p className="mb-2 text-xs" style={{ color: "var(--text-faint)" }}>
+            {loading ? "Loading…" : `${companies.length} ${companies.length === 1 ? "company" : "companies"}`}
+          </p>
+          <div
+            className="overflow-hidden rounded-2xl border"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+          >
+            {!loading && companies.length === 0 && (
+              <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                No companies yet.
+              </p>
+            )}
+            {companies.map((c, i) => (
+              <div
+                key={c.id}
+                onClick={() => router.push(`/admin/proposals?q=${encodeURIComponent(c.company_name)}`)}
+                className="cursor-pointer px-4 py-3 transition-colors"
+                style={i > 0 ? { borderTop: "1px solid var(--border)" } : undefined}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar name={c.company_name} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                      {c.company_name}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-1.5 truncate text-xs" style={{ color: "var(--text-faint)" }}>
+                      {c.contact_person && <span>{c.contact_person} ·</span>}
+                      <CopyField value={c.email} />
+                      {c.phone && (
+                        <>
+                          <span>·</span>
+                          <CopyField value={c.phone} />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <StatusPill status={c.status ?? "active"} />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCompany(c.id);
+                    }}
+                    disabled={deletingId === c.id}
+                    className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:opacity-70 disabled:opacity-40"
+                    style={{ color: "var(--danger)" }}
+                    title="Delete company"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <StatusPill status={c.status ?? "active"} />
-                <button
-                  onClick={() => deleteCompany(c.id)}
-                  disabled={deletingId === c.id}
-                  className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:opacity-70 disabled:opacity-40"
-                  style={{ color: "var(--danger)" }}
-                  title="Delete company"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {rowError?.id === c.id && (
+                  <p className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
+                    {rowError.message}
+                  </p>
+                )}
               </div>
-              {rowError?.id === c.id && (
-                <p className="mt-2 rounded-lg px-2.5 py-1.5 text-xs" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>
-                  {rowError.message}
-                </p>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <form
