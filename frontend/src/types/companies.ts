@@ -48,4 +48,12 @@ export type DashboardStats = {
   approved: number;
   rejected: number;
   changes_requested: number;
+  today: number;
+};
+
+export type ChatStats = {
+  total: number;
+  active: number;
+  closed: number;
+  today: number;
 };

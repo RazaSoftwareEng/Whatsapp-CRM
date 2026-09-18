@@ -80,6 +80,22 @@ class ChatViewSet(viewsets.ModelViewSet):
             return ChatDetailSerializer
         return ChatSerializer
 
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        """Chat counts for the requesting user's own dashboard — total/active/closed
+        within whatever chats their role can see (see get_queryset above), plus how
+        many of those had activity today."""
+        qs = self.get_queryset()
+        today = timezone.localdate()
+        return Response(
+            {
+                "total": qs.count(),
+                "active": qs.exclude(status=Chat.Status.CLOSED).count(),
+                "closed": qs.filter(status=Chat.Status.CLOSED).count(),
+                "today": qs.filter(last_message_at__date=today).count(),
+            }
+        )
+
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):
         """Mark this chat as read by the current viewer."""

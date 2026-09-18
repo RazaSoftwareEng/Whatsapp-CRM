@@ -257,6 +257,7 @@ class ProposalViewSet(viewsets.ModelViewSet):
                 "approved": qs.filter(status=Proposal.Status.APPROVED).count(),
                 "rejected": qs.filter(status=Proposal.Status.REJECTED).count(),
                 "changes_requested": qs.filter(status=Proposal.Status.CHANGES_REQUESTED).count(),
+                "today": qs.filter(created_at__date=timezone.localdate()).count(),
             }
         )
 

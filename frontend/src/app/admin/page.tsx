@@ -11,7 +11,14 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, Message, UserRow } from "@/types/admin";
 import type { DashboardStats, ProposalActivity } from "@/types/companies";
 
-const EMPTY_PROPOSAL_STATS: DashboardStats = { total: 0, pending_review: 0, approved: 0, rejected: 0, changes_requested: 0 };
+const EMPTY_PROPOSAL_STATS: DashboardStats = {
+  total: 0,
+  pending_review: 0,
+  approved: 0,
+  rejected: 0,
+  changes_requested: 0,
+  today: 0,
+};
 
 export default function DashboardPage() {
   const [chats, setChats] = useState<ChatRow[]>([]);

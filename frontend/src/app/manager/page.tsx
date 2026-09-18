@@ -2,19 +2,39 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock, FileText, RefreshCw, XCircle } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  FileText,
+  MessageCircle,
+  RefreshCw,
+  Radio,
+  XCircle,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
-import type { DashboardStats, ProposalActivity } from "@/types/companies";
+import type { ChatStats, DashboardStats, ProposalActivity } from "@/types/companies";
 
-const EMPTY_STATS: DashboardStats = { total: 0, pending_review: 0, approved: 0, rejected: 0, changes_requested: 0 };
+const EMPTY_STATS: DashboardStats = {
+  total: 0,
+  pending_review: 0,
+  approved: 0,
+  rejected: 0,
+  changes_requested: 0,
+  today: 0,
+};
+const EMPTY_CHAT_STATS: ChatStats = { total: 0, active: 0, closed: 0, today: 0 };
 
 export default function ManagerDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
+  const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
   const [activity, setActivity] = useState<ProposalActivity[]>([]);
 
   const loadData = useCallback(() => {
     api.get<DashboardStats>("/proposals/dashboard/").then((res) => setStats(res.data));
+    api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data));
     api.get<ProposalActivity[]>("/proposals/activity/?limit=10").then((res) => setActivity(res.data));
   }, []);
 
@@ -48,6 +68,32 @@ export default function ManagerDashboardPage() {
       color: "var(--orange)",
       soft: "var(--orange-soft)",
     },
+    {
+      label: "Today's proposals",
+      value: stats.today,
+      icon: CalendarDays,
+      color: "var(--teal-strong)",
+      soft: "var(--teal-soft)",
+    },
+  ];
+
+  const chatCards = [
+    { label: "Total chats", value: chatStats.total, icon: MessageCircle, color: "var(--indigo)", soft: "var(--indigo-soft)" },
+    { label: "Active chats", value: chatStats.active, icon: Radio, color: "var(--warning)", soft: "var(--warning-soft)" },
+    {
+      label: "Closed chats",
+      value: chatStats.closed,
+      icon: CheckCircle2,
+      color: "var(--success)",
+      soft: "var(--success-soft)",
+    },
+    {
+      label: "Today's chats",
+      value: chatStats.today,
+      icon: CalendarDays,
+      color: "var(--teal-strong)",
+      soft: "var(--teal-soft)",
+    },
   ];
 
   return (
@@ -61,6 +107,32 @@ export default function ManagerDashboardPage() {
 
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((s) => (
+          <div
+            key={s.label}
+            className="rounded-2xl border p-4"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+          >
+            <div
+              className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg"
+              style={{ background: s.soft, color: s.color }}
+            >
+              <s.icon size={18} />
+            </div>
+            <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
+              {s.value}
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {s.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="mb-3 text-sm font-semibold" style={{ color: "var(--text)" }}>
+        Chats
+      </h2>
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {chatCards.map((s) => (
           <div
             key={s.label}
             className="rounded-2xl border p-4"
