@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FileText, Inbox, MessageCircle, MessagesSquare, Users } from "lucide-react";
+import { ArrowRight, FileText, Inbox, MessageCircle, MessagesSquare, Users, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { Avatar } from "@/components/ui/Avatar";
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [proposalStats, setProposalStats] = useState<DashboardStats>(EMPTY_PROPOSAL_STATS);
   const [proposalActivity, setProposalActivity] = useState<ProposalActivity[]>([]);
+  const [showFailedModal, setShowFailedModal] = useState(false);
 
   const loadData = useCallback(() => {
     api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
@@ -71,8 +72,13 @@ export default function DashboardPage() {
       icon: MessagesSquare,
       color: "var(--danger)",
       soft: "var(--danger-soft)",
+      onClick: () => setShowFailedModal(true),
     },
   ];
+
+  const failedList = [...failedMessages].sort(
+    (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
+  );
 
   const pipeline = [
     { key: "unassigned", label: "Unassigned", count: unassigned.length, color: "var(--warning)" },
@@ -109,7 +115,8 @@ export default function DashboardPage() {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-2xl border p-4"
+            onClick={s.onClick}
+            className={`rounded-2xl border p-4 transition-colors ${s.onClick ? "cursor-pointer hover:bg-[var(--surface-2)]" : ""}`}
             style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
           >
             <div
@@ -337,6 +344,74 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {showFailedModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setShowFailedModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-2xl border"
+            style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-md)" }}
+          >
+            <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--border)" }}>
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                  Failed messages
+                </h2>
+                <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                  {failedList.length} message{failedList.length === 1 ? "" : "s"} didn&apos;t deliver
+                </p>
+              </div>
+              <button
+                onClick={() => setShowFailedModal(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:opacity-70"
+                style={{ color: "var(--text-faint)" }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 py-2">
+              {failedList.length === 0 ? (
+                <p className="py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+                  No failed messages.
+                </p>
+              ) : (
+                failedList.map((m) => {
+                  const chat = chatById.get(m.chat);
+                  const name = chat?.lead.name || chat?.lead.phone_number || "Unknown";
+                  return (
+                    <Link
+                      key={m.id}
+                      href={`/admin/chats?chat=${m.chat}`}
+                      onClick={() => setShowFailedModal(false)}
+                      className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--surface-2)]"
+                    >
+                      <Avatar name={name} size={32} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                          {name}
+                        </p>
+                        <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
+                          {chat?.lead.phone_number}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs" style={{ color: "var(--text-muted)" }}>
+                          {m.body || "(media)"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                        {formatTime(m.sent_at)}
+                      </span>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { MessageCircle, Send, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
@@ -19,8 +20,20 @@ import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatRow, ChatDetail } from "@/types/admin";
 
 export default function AdminChatsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminChatsPageInner />
+    </Suspense>
+  );
+}
+
+function AdminChatsPageInner() {
+  const searchParams = useSearchParams();
   const [chats, setChats] = useState<ChatRow[]>([]);
-  const [activeId, setActiveId] = useState<number | null>(null);
+  const [activeId, setActiveId] = useState<number | null>(() => {
+    const fromUrl = searchParams.get("chat");
+    return fromUrl ? Number(fromUrl) : null;
+  });
   const [activeChat, setActiveChat] = useState<ChatDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
