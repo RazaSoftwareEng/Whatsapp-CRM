@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg)" }}>
       <aside
-        className="flex w-60 shrink-0 flex-col border-r px-3 py-4"
+        className="sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r px-3 py-4"
         style={{ borderColor: "var(--border)", background: "var(--surface)" }}
       >
         <div className="mb-6 flex items-center gap-2.5 px-2">
