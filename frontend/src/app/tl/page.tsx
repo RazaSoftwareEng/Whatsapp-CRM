@@ -1,19 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Headset, Inbox, MessagesSquare } from "lucide-react";
+import { CalendarDays, Headset, Inbox, MessagesSquare } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, UserRow } from "@/types/admin";
+import type { ChatStats } from "@/types/companies";
+
+const EMPTY_CHAT_STATS: ChatStats = { total: 0, active: 0, closed: 0, today: 0, new_today: 0 };
 
 export default function TLDashboardPage() {
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [agents, setAgents] = useState<UserRow[]>([]);
+  const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
 
   const loadData = useCallback(() => {
     api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
     api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data));
+    api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data));
   }, []);
 
   useEffect(() => {
@@ -43,6 +48,13 @@ export default function TLDashboardPage() {
       soft: "var(--indigo-soft)",
     },
     { label: "Agents", value: agents.length, icon: Headset, color: "var(--success)", soft: "var(--success-soft)" },
+    {
+      label: "New chats today",
+      value: chatStats.new_today,
+      icon: CalendarDays,
+      color: "var(--orange)",
+      soft: "var(--orange-soft)",
+    },
   ];
 
   const workload = agents.map((agent) => {

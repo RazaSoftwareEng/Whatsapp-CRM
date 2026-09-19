@@ -25,7 +25,7 @@ const EMPTY_STATS: DashboardStats = {
   changes_requested: 0,
   today: 0,
 };
-const EMPTY_CHAT_STATS: ChatStats = { total: 0, active: 0, closed: 0, today: 0 };
+const EMPTY_CHAT_STATS: ChatStats = { total: 0, active: 0, closed: 0, today: 0, new_today: 0 };
 
 export default function ManagerDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);

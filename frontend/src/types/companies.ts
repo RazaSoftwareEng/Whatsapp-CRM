@@ -56,4 +56,5 @@ export type ChatStats = {
   active: number;
   closed: number;
   today: number;
+  new_today: number;
 };

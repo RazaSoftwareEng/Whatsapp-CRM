@@ -21,6 +21,9 @@ import { useAutoScroll } from "@/lib/useAutoScroll";
 import { useAttachmentUpload } from "@/lib/useAttachmentUpload";
 import { groupMessagesByDay } from "@/lib/groupMessagesByDay";
 import type { ChatDetail, ChatRow as ChatSummary } from "@/types/admin";
+import type { ChatStats } from "@/types/companies";
+
+const EMPTY_CHAT_STATS: ChatStats = { total: 0, active: 0, closed: 0, today: 0, new_today: 0 };
 
 export default function AgentPage() {
   const { user, loading, logout } = useAuth();
@@ -31,6 +34,7 @@ export default function AgentPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
   const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
     activeChat?.messages.length ?? 0,
     activeId
@@ -42,6 +46,7 @@ export default function AgentPage() {
 
   const loadChats = useCallback(() => {
     api.get<ChatSummary[]>("/chats/").then((res) => setChats(res.data));
+    api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data));
   }, []);
 
   const loadActive = useCallback((id: number) => {
@@ -138,6 +143,10 @@ export default function AgentPage() {
             style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
           />
         </div>
+
+        <p className="px-4 pb-1 pt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          {chatStats.new_today} new chat{chatStats.new_today === 1 ? "" : "s"} today
+        </p>
 
         <NewContactForm
           onCreated={(chat) => {
