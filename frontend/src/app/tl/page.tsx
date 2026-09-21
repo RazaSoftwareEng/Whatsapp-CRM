@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { CalendarDays, Headset, Inbox, MessagesSquare } from "lucide-react";
 import { api } from "@/lib/api";
+import { usePolledLoad } from "@/lib/usePolledLoad";
 import { Avatar } from "@/components/ui/Avatar";
+import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, UserRow } from "@/types/admin";
 import type { ChatStats } from "@/types/companies";
@@ -15,17 +17,18 @@ export default function TLDashboardPage() {
   const [agents, setAgents] = useState<UserRow[]>([]);
   const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
 
-  const loadData = useCallback(() => {
-    api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
-    api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data));
-    api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data));
-  }, []);
+  const loadData = useCallback(
+    () =>
+      Promise.all([
+        api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data)),
+        api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data)),
+        api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data)),
+      ]),
+    []
+  );
 
-  useEffect(() => {
-    loadData();
-    const t = setInterval(loadData, 6000);
-    return () => clearInterval(t);
-  }, [loadData]);
+  const { state: loadState, retry } = usePolledLoad(loadData);
+  const show = (value: number) => (loadState === "loading" ? <StatSkeleton /> : loadState === "error" ? "—" : value);
 
   const unassigned = chats.filter((c) => c.status === "unassigned");
   const inProgress = chats.filter((c) => c.status === "in_progress");
@@ -76,6 +79,8 @@ export default function TLDashboardPage() {
         Overview of your team&apos;s chat activity.
       </p>
 
+      {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (
           <div
@@ -90,7 +95,7 @@ export default function TLDashboardPage() {
               <s.icon size={18} />
             </div>
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-              {s.value}
+              {show(s.value)}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {s.label}

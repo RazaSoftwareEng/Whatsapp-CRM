@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
+import { usePolledLoad } from "@/lib/usePolledLoad";
+import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import type { ChatStats, DashboardStats, ProposalActivity } from "@/types/companies";
 
 const EMPTY_STATS: DashboardStats = {
@@ -32,17 +34,18 @@ export default function ManagerDashboardPage() {
   const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
   const [activity, setActivity] = useState<ProposalActivity[]>([]);
 
-  const loadData = useCallback(() => {
-    api.get<DashboardStats>("/proposals/dashboard/").then((res) => setStats(res.data));
-    api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data));
-    api.get<ProposalActivity[]>("/proposals/activity/?limit=10").then((res) => setActivity(res.data));
-  }, []);
+  const loadData = useCallback(
+    () =>
+      Promise.all([
+        api.get<DashboardStats>("/proposals/dashboard/").then((res) => setStats(res.data)),
+        api.get<ChatStats>("/chats/stats/").then((res) => setChatStats(res.data)),
+        api.get<ProposalActivity[]>("/proposals/activity/?limit=10").then((res) => setActivity(res.data)),
+      ]),
+    []
+  );
 
-  useEffect(() => {
-    loadData();
-    const t = setInterval(loadData, 6000);
-    return () => clearInterval(t);
-  }, [loadData]);
+  const { state: loadState, retry } = usePolledLoad(loadData);
+  const show = (value: number) => (loadState === "loading" ? <StatSkeleton /> : loadState === "error" ? "—" : value);
 
   const cards = [
     { label: "Total proposals", value: stats.total, icon: FileText, color: "var(--indigo)", soft: "var(--indigo-soft)" },
@@ -105,6 +108,8 @@ export default function ManagerDashboardPage() {
         Track the proposals you have sent out for review.
       </p>
 
+      {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((s) => (
           <div
@@ -119,7 +124,7 @@ export default function ManagerDashboardPage() {
               <s.icon size={18} />
             </div>
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-              {s.value}
+              {show(s.value)}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {s.label}
@@ -145,7 +150,7 @@ export default function ManagerDashboardPage() {
               <s.icon size={18} />
             </div>
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-              {s.value}
+              {show(s.value)}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {s.label}

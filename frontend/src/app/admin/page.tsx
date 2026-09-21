@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, FileText, Inbox, MessageCircle, MessagesSquare, Users, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
+import { usePolledLoad } from "@/lib/usePolledLoad";
 import { Avatar } from "@/components/ui/Avatar";
 import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
+import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, Message, UserRow } from "@/types/admin";
 import type { DashboardStats, ProposalActivity } from "@/types/companies";
@@ -28,19 +30,20 @@ export default function DashboardPage() {
   const [proposalActivity, setProposalActivity] = useState<ProposalActivity[]>([]);
   const [showFailedModal, setShowFailedModal] = useState(false);
 
-  const loadData = useCallback(() => {
-    api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
-    api.get<UserRow[]>("/users/").then((res) => setUsers(res.data));
-    api.get<Message[]>("/messages/").then((res) => setMessages(res.data));
-    api.get<DashboardStats>("/proposals/dashboard/").then((res) => setProposalStats(res.data));
-    api.get<ProposalActivity[]>("/proposals/activity/?limit=5").then((res) => setProposalActivity(res.data));
-  }, []);
+  const loadData = useCallback(
+    () =>
+      Promise.all([
+        api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data)),
+        api.get<UserRow[]>("/users/").then((res) => setUsers(res.data)),
+        api.get<Message[]>("/messages/").then((res) => setMessages(res.data)),
+        api.get<DashboardStats>("/proposals/dashboard/").then((res) => setProposalStats(res.data)),
+        api.get<ProposalActivity[]>("/proposals/activity/?limit=5").then((res) => setProposalActivity(res.data)),
+      ]),
+    []
+  );
 
-  useEffect(() => {
-    loadData();
-    const t = setInterval(loadData, 6000);
-    return () => clearInterval(t);
-  }, [loadData]);
+  const { state: loadState, retry } = usePolledLoad(loadData);
+  const show = (value: number) => (loadState === "loading" ? <StatSkeleton /> : loadState === "error" ? "—" : value);
 
   const unassigned = chats.filter((c) => c.status === "unassigned");
   const inProgress = chats.filter((c) => c.status === "in_progress");
@@ -111,6 +114,8 @@ export default function DashboardPage() {
         Overview of your WhatsApp CRM activity.
       </p>
 
+      {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {stats.map((s) => (
           <div
@@ -126,7 +131,7 @@ export default function DashboardPage() {
               <s.icon size={18} />
             </div>
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-              {s.value}
+              {show(s.value)}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {s.label}
@@ -155,7 +160,7 @@ export default function DashboardPage() {
           {pipeline.map((stage) => (
             <div key={stage.key} className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
               <span className="h-2 w-2 rounded-full" style={{ background: stage.color }} />
-              {stage.label} — <span style={{ color: "var(--text)" }}>{stage.count}</span>
+              {stage.label} — <span style={{ color: "var(--text)" }}>{show(stage.count)}</span>
             </div>
           ))}
         </div>
@@ -188,7 +193,7 @@ export default function DashboardPage() {
           ].map((s) => (
             <div key={s.label} className="rounded-xl p-3" style={{ background: "var(--surface-2)" }}>
               <p className="text-xl font-semibold tabular-nums" style={{ color: s.color }}>
-                {s.value}
+                {show(s.value)}
               </p>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {s.label}
