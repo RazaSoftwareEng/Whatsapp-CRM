@@ -1,17 +1,29 @@
 "use client";
 
-import { useState, type SubmitEvent } from "react";
+import { Suspense, useState, type SubmitEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { LogIn, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/ui/Logo";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const { login } = useAuth();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    searchParams.get("expired") ? "Your session expired. Please sign in again." : ""
+  );
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: SubmitEvent) {
