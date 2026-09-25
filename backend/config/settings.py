@@ -178,8 +178,10 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    # Hard 12-hour session: refresh lifetime matches access, so once the login
+    # is 12h old there's nothing left to refresh with and the user must sign in again.
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=12),
 }
 
 
