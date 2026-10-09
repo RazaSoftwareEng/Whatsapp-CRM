@@ -23,6 +23,7 @@ export type ChatRow = {
     phone_number: string;
     client_status: ClientStatus;
     tags: { id: number; name: string }[];
+    created_at: string;
   };
   assigned_user: number | null;
   assigned_user_username: string | null;

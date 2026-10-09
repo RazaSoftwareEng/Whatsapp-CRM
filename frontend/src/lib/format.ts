@@ -6,7 +6,7 @@ export function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
 }
 
-function isSameDay(a: Date, b: Date) {
+export function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 

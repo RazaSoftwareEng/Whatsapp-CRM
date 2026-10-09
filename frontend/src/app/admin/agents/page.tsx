@@ -1,22 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useState, type SubmitEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { UserRow } from "@/types/admin";
+import { isSameDay } from "@/lib/format";
+import type { ChatRow, UserRow } from "@/types/admin";
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<UserRow[]>([]);
   const [teamLeads, setTeamLeads] = useState<UserRow[]>([]);
+  const [chats, setChats] = useState<ChatRow[]>([]);
   const [newAgent, setNewAgent] = useState({ username: "", email: "", password: "", team_lead: "" });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
 
   const loadAgents = useCallback(() => {
     api.get<UserRow[]>("/agents/").then((res) => setAgents(res.data));
+    api.get<ChatRow[]>("/chats/").then((res) => setChats(res.data));
   }, []);
 
   useEffect(() => {
@@ -24,6 +27,16 @@ export default function AgentsPage() {
     const t = setInterval(loadAgents, 6000);
     return () => clearInterval(t);
   }, [loadAgents]);
+
+  const newChatsTodayByAgent = useMemo(() => {
+    const today = new Date();
+    const counts = new Map<number, number>();
+    for (const chat of chats) {
+      if (!chat.assigned_user || !isSameDay(new Date(chat.lead.created_at), today)) continue;
+      counts.set(chat.assigned_user, (counts.get(chat.assigned_user) ?? 0) + 1);
+    }
+    return counts;
+  }, [chats]);
 
   useEffect(() => {
     api.get<UserRow[]>("/users/").then((res) => setTeamLeads(res.data.filter((u) => u.role === "tl")));
@@ -82,6 +95,13 @@ export default function AgentsPage() {
                   {a.team_lead_username ? ` · reports to ${a.team_lead_username}` : ""}
                 </p>
               </div>
+              <span
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                style={{ background: "var(--teal-soft)", color: "var(--teal-strong)" }}
+                title="New chats today"
+              >
+                {newChatsTodayByAgent.get(a.id) ?? 0} new today
+              </span>
               <StatusPill status={a.status} />
             </div>
           ))}
