@@ -6,11 +6,12 @@ import requests
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.db.models import F
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
@@ -35,8 +36,10 @@ def _normalize_phone(raw: str) -> str:
 
 class IsAdminOrTLOrOwnChat(permissions.BasePermission):
     """Admin: full access. TL: every chat except manager-started ones (those are
-    private to the manager who started them, and admin). Agent/Manager: only
-    chats assigned to them."""
+    private to the manager who started them, and admin). Agent: chats assigned
+    to them, plus any still-unassigned chat (open for any agent to claim by
+    replying — see MessageViewSet._claim_or_check_access). Manager: only chats
+    assigned to them."""
 
     def has_object_permission(self, request, view, obj):
         user = request.user
@@ -44,6 +47,8 @@ class IsAdminOrTLOrOwnChat(permissions.BasePermission):
             return True
         if user.role == "tl":
             return obj.lead.source != MANAGER_LEAD_SOURCE
+        if user.role == "agent":
+            return obj.assigned_user_id == user.id or obj.assigned_user_id is None
         return obj.assigned_user_id == user.id
 
 
@@ -73,6 +78,10 @@ class ChatViewSet(viewsets.ModelViewSet):
             return qs
         if user.role == "tl":
             return qs.exclude(lead__source=MANAGER_LEAD_SOURCE)
+        if user.role == "agent":
+            # Their own chats, plus the shared pool of unclaimed inbound chats —
+            # any agent can see and claim one by sending the first reply.
+            return qs.filter(Q(assigned_user=user) | Q(status=Chat.Status.UNASSIGNED))
         return qs.filter(assigned_user=user)
 
     def get_serializer_class(self):
@@ -216,6 +225,28 @@ class ChatViewSet(viewsets.ModelViewSet):
         return Response(ChatDetailSerializer(chat).data, status=201)
 
 
+def _claim_or_check_access(chat, user):
+    """Admin/TL: no restriction. Agent/manager: must already own this chat — unless
+    it's still unassigned, in which case replying to it claims it for them (first
+    reply wins; a concurrent claim attempt from another agent loses and is told so).
+    Raises a DRF exception on failure; returns nothing on success (chat is mutated
+    in place if a claim happened)."""
+    if user.role in ("admin", "tl"):
+        return
+    if chat.assigned_user_id is None:
+        claimed = Chat.objects.filter(pk=chat.pk, assigned_user__isnull=True).update(
+            assigned_user=user, status=Chat.Status.IN_PROGRESS
+        )
+        if not claimed:
+            # Passed as a dict so the response body is {"detail": "..."} like every
+            # other error here — a bare string would come back as a raw JSON list.
+            raise ValidationError({"detail": "This chat was just claimed by another agent."})
+        chat.assigned_user_id = user.id
+        chat.status = Chat.Status.IN_PROGRESS
+    elif chat.assigned_user_id != user.id:
+        raise PermissionDenied("You do not have access to this chat.")
+
+
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -227,10 +258,15 @@ class MessageViewSet(viewsets.ModelViewSet):
             return qs
         if user.role == "tl":
             return qs.exclude(chat__lead__source=MANAGER_LEAD_SOURCE)
+        if user.role == "agent":
+            return qs.filter(Q(chat__assigned_user=user) | Q(chat__status=Chat.Status.UNASSIGNED))
         return qs.filter(chat__assigned_user=user)
 
     def perform_create(self, serializer):
         """Agent/admin reply: save as outbound, then push it to WhatsApp via Meta."""
+        chat = serializer.validated_data["chat"]
+        _claim_or_check_access(chat, self.request.user)
+
         message = serializer.save(
             direction=Message.Direction.OUT,
             delivery_status=Message.DeliveryStatus.PENDING,
@@ -253,8 +289,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         inbound media from.
         """
         chat = get_object_or_404(Chat.objects.select_related("lead"), pk=request.data.get("chat"))
-        if not IsAdminOrTLOrOwnChat().has_object_permission(request, self, chat):
-            return Response({"detail": "You do not have access to this chat."}, status=403)
+        _claim_or_check_access(chat, request.user)
 
         upload = request.FILES.get("file")
         if not upload:

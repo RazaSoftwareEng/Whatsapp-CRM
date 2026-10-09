@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type SubmitEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, MessageCircle, Search, Send } from "lucide-react";
+import { isAxiosError } from "axios";
+import { LogOut, MessageCircle, Send } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,6 +14,7 @@ import { NewContactForm } from "@/components/NewContactForm";
 import { formatTime } from "@/lib/format";
 import { MessageContent } from "@/components/ui/MessageContent";
 import { JumpToLatestButton } from "@/components/ui/JumpToLatestButton";
+import { ChatListControls, type ChatTab } from "@/components/ui/ChatListControls";
 import { ChatListItem } from "@/components/ui/ChatListItem";
 import { DateDivider } from "@/components/ui/DateDivider";
 import { ChatHeaderTags } from "@/components/ui/ChatHeaderTags";
@@ -34,6 +36,7 @@ export default function AgentPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<ChatTab>("all");
   const [chatStats, setChatStats] = useState<ChatStats>(EMPTY_CHAT_STATS);
   const { containerRef, showJump, scrollToBottom, onScroll } = useAutoScroll(
     activeChat?.messages.length ?? 0,
@@ -69,16 +72,30 @@ export default function AgentPage() {
     return () => clearInterval(t);
   }, [activeId, loadActive]);
 
+  const counts = useMemo(
+    () => ({
+      all: chats.length,
+      assigned: chats.filter((c) => c.assigned_user).length,
+      unassigned: chats.filter((c) => !c.assigned_user).length,
+    }),
+    [chats]
+  );
+
   const filteredChats = useMemo(() => {
+    let list = chats;
+    if (tab === "assigned") list = list.filter((c) => c.assigned_user);
+    if (tab === "unassigned") list = list.filter((c) => !c.assigned_user);
     const q = search.trim().toLowerCase();
-    if (!q) return chats;
-    return chats.filter(
-      (c) =>
-        (c.lead.name || "").toLowerCase().includes(q) ||
-        c.lead.phone_number.toLowerCase().includes(q) ||
-        (c.last_message_body || "").toLowerCase().includes(q)
-    );
-  }, [chats, search]);
+    if (q) {
+      list = list.filter(
+        (c) =>
+          (c.lead.name || "").toLowerCase().includes(q) ||
+          c.lead.phone_number.toLowerCase().includes(q) ||
+          (c.last_message_body || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [chats, tab, search]);
 
   const messageFeed = useMemo(() => groupMessagesByDay(activeChat?.messages ?? []), [activeChat?.messages]);
 
@@ -90,6 +107,13 @@ export default function AgentPage() {
       await api.post("/messages/", { chat: activeId, body: draft });
       setDraft("");
       loadActive(activeId);
+      loadChats();
+    } catch (err) {
+      const detail = isAxiosError(err) ? err.response?.data?.detail : undefined;
+      alert(detail || "Could not send this message.");
+      setActiveId(null);
+      setActiveChat(null);
+      loadChats();
     } finally {
       setSending(false);
     }
@@ -129,20 +153,14 @@ export default function AgentPage() {
           </button>
         </div>
 
-        <div className="relative px-3 pt-3">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-6 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--text-faint)" }}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats…"
-            className="w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
-          />
-        </div>
+        <ChatListControls
+          search={search}
+          onSearchChange={setSearch}
+          tab={tab}
+          onTabChange={setTab}
+          counts={counts}
+          accent="var(--teal-strong)"
+        />
 
         <p className="px-4 pb-1 pt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
           {chatStats.new_today} new chat{chatStats.new_today === 1 ? "" : "s"} today
@@ -158,7 +176,7 @@ export default function AgentPage() {
         <div className="flex-1 overflow-y-auto">
           {filteredChats.length === 0 && (
             <p className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              {chats.length === 0 ? "No chats assigned yet." : "No chats match your search."}
+              {chats.length === 0 ? "No chats yet." : "No chats match this filter."}
             </p>
           )}
           {filteredChats.map((chat) => (
@@ -169,6 +187,7 @@ export default function AgentPage() {
               onClick={() => setActiveId(chat.id)}
               accent="var(--teal-strong)"
               activeBg="var(--teal-soft)"
+              secondaryLine={chat.assigned_user ? undefined : "Unclaimed — reply to take it"}
             />
           ))}
         </div>
