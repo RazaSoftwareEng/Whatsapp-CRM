@@ -48,7 +48,9 @@ class IsAdminOrTLOrOwnChat(permissions.BasePermission):
         if user.role == "tl":
             return obj.lead.source != MANAGER_LEAD_SOURCE
         if user.role == "agent":
-            return obj.assigned_user_id == user.id or obj.assigned_user_id is None
+            return obj.assigned_user_id == user.id or (
+                obj.assigned_user_id is None and obj.lead.source != MANAGER_LEAD_SOURCE
+            )
         return obj.assigned_user_id == user.id
 
 
@@ -80,8 +82,11 @@ class ChatViewSet(viewsets.ModelViewSet):
             return qs.exclude(lead__source=MANAGER_LEAD_SOURCE)
         if user.role == "agent":
             # Their own chats, plus the shared pool of unclaimed inbound chats —
-            # any agent can see and claim one by sending the first reply.
-            return qs.filter(Q(assigned_user=user) | Q(status=Chat.Status.UNASSIGNED))
+            # any agent can see and claim one by sending the first reply. Manager-
+            # started chats never enter that pool, even if somehow left unassigned.
+            return qs.filter(
+                Q(assigned_user=user) | (Q(status=Chat.Status.UNASSIGNED) & ~Q(lead__source=MANAGER_LEAD_SOURCE))
+            )
         return qs.filter(assigned_user=user)
 
     def get_serializer_class(self):
@@ -126,6 +131,9 @@ class ChatViewSet(viewsets.ModelViewSet):
         user_id = request.data.get("user_id")
         requester = request.user
 
+        if requester.role == "tl" and chat.lead.source == MANAGER_LEAD_SOURCE:
+            return Response({"detail": "This chat is private to the manager who started it."}, status=403)
+
         if requester.role == "tl":
             current_owner = chat.assigned_user
             if current_owner is not None and current_owner.id != requester.id and current_owner.team_lead_id != requester.id:
@@ -159,6 +167,11 @@ class ChatViewSet(viewsets.ModelViewSet):
             for field, value in lead_fields.items():
                 if value and field != "source":
                     setattr(lead, field, value)
+            # A manager contacting a number that already existed as a regular lead
+            # must still make it private — never the other way around (plain
+            # "start" never downgrades an existing manager lead back to public).
+            if source == MANAGER_LEAD_SOURCE:
+                lead.source = MANAGER_LEAD_SOURCE
             lead.save()
 
         chat, chat_created = Chat.objects.get_or_create(
@@ -233,7 +246,7 @@ def _claim_or_check_access(chat, user):
     in place if a claim happened)."""
     if user.role in ("admin", "tl"):
         return
-    if chat.assigned_user_id is None:
+    if chat.assigned_user_id is None and chat.lead.source != MANAGER_LEAD_SOURCE:
         claimed = Chat.objects.filter(pk=chat.pk, assigned_user__isnull=True).update(
             assigned_user=user, status=Chat.Status.IN_PROGRESS
         )
@@ -259,7 +272,10 @@ class MessageViewSet(viewsets.ModelViewSet):
         if user.role == "tl":
             return qs.exclude(chat__lead__source=MANAGER_LEAD_SOURCE)
         if user.role == "agent":
-            return qs.filter(Q(chat__assigned_user=user) | Q(chat__status=Chat.Status.UNASSIGNED))
+            return qs.filter(
+                Q(chat__assigned_user=user)
+                | (Q(chat__status=Chat.Status.UNASSIGNED) & ~Q(chat__lead__source=MANAGER_LEAD_SOURCE))
+            )
         return qs.filter(chat__assigned_user=user)
 
     def perform_create(self, serializer):
