@@ -14,6 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -26,3 +28,8 @@ urlpatterns = [
     path('api/public/', include('catalog.public_urls')),
     path('webhooks/', include('webhooks.urls')),
 ]
+
+# Local dev only — in production MEDIA_URL is served by Nginx straight off the
+# shared media_files volume (see docker-compose.prod.yml), not by Django.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
