@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'leads',
     'webhooks',
     'companies',
+    'catalog',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -185,7 +186,11 @@ SIMPLE_JWT = {
 }
 
 
-# CORS — allow the Next.js frontend to call this API
+# CORS — allow the Next.js frontend to call this API. Also add here any other
+# project's domain that needs browser-side access to the public catalog feed
+# (/api/public/products/) — comma-separated, e.g.
+# CORS_ALLOWED_ORIGINS=http://localhost:3000,https://my-other-project.com
+# (server-to-server calls to that feed aren't affected by CORS at all).
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default="http://localhost:3000", cast=Csv()

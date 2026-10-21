@@ -22,5 +22,7 @@ urlpatterns = [
     path('api/', include('accounts.urls')),
     path('api/', include('leads.urls')),
     path('api/', include('companies.urls')),
+    path('api/', include('catalog.urls')),
+    path('api/public/', include('catalog.public_urls')),
     path('webhooks/', include('webhooks.urls')),
 ]
