@@ -17,6 +17,31 @@ class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def _apply_legacy_image_upload(self, product, request):
+        """Back-compat: a client sending a single "image" file on
+        create/update (the old single-image API shape) still works — it
+        replaces the featured ProductImage (or creates one) instead of being
+        silently dropped now that Product has no image field of its own."""
+        image_file = request.FILES.get("image")
+        if not image_file:
+            return
+        featured = product.images.filter(is_featured=True).first()
+        if featured:
+            featured.image = image_file
+            featured.save(update_fields=["image"])
+            return
+        if product.images.count() >= MAX_IMAGES_PER_PRODUCT:
+            product.images.order_by("created_at").first().delete()
+        ProductImage.objects.create(product=product, image=image_file, is_featured=True)
+
+    def perform_create(self, serializer):
+        product = serializer.save()
+        self._apply_legacy_image_upload(product, self.request)
+
+    def perform_update(self, serializer):
+        product = serializer.save()
+        self._apply_legacy_image_upload(product, self.request)
+
 
 class ProductImageViewSet(viewsets.ModelViewSet):
     """Admin-only — upload/remove a product's images and pick which one is
