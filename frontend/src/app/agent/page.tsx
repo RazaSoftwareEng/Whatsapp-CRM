@@ -165,6 +165,10 @@ export default function AgentPage() {
         <p className="px-4 pb-1 pt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
           {chatStats.new_today} new chat{chatStats.new_today === 1 ? "" : "s"} today
         </p>
+        <p className="px-4 pb-2 text-[11px] leading-snug" style={{ color: "var(--text-faint)" }}>
+          Tip: give new contacts <span className="font-semibold" style={{ color: "var(--text-muted)" }}>+971 56 538 4322</span> to
+          message first — replies within 24h of their message are free.
+        </p>
 
         <NewContactForm
           onCreated={(chat) => {

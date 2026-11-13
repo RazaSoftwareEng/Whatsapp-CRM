@@ -5,6 +5,7 @@ import { CalendarDays, Headset, Inbox, MessagesSquare } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePolledLoad } from "@/lib/usePolledLoad";
 import { Avatar } from "@/components/ui/Avatar";
+import { CostSavingNote } from "@/components/ui/CostSavingNote";
 import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, UserRow } from "@/types/admin";
@@ -80,6 +81,8 @@ export default function TLDashboardPage() {
       </p>
 
       {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
+      <CostSavingNote accent="var(--teal-strong)" />
 
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((s) => (

@@ -1,17 +1,51 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FileText, Inbox, MessageCircle, MessagesSquare, Users, X } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  FileText,
+  Headset,
+  Inbox,
+  MessageCircle,
+  MessagesSquare,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { usePolledLoad } from "@/lib/usePolledLoad";
 import { Avatar } from "@/components/ui/Avatar";
-import { DeliveryIcon } from "@/components/ui/DeliveryIcon";
+import { CostSavingNote } from "@/components/ui/CostSavingNote";
 import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
+import { SimpleLineChart, type ChartPoint } from "@/components/ui/SimpleLineChart";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, Message, UserRow } from "@/types/admin";
 import type { DashboardStats, ProposalActivity } from "@/types/companies";
+
+type ChartRange = 7 | 30 | 90;
+
+function buildDailyCounts(dates: string[], days: ChartRange): ChartPoint[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const buckets = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    buckets.set(d.toDateString(), 0);
+  }
+  for (const iso of dates) {
+    const key = new Date(iso).toDateString();
+    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  return [...buckets.entries()].map(([key, value]) => ({
+    label: new Date(key).toLocaleDateString([], { month: "short", day: "numeric" }),
+    value,
+  }));
+}
 
 const EMPTY_PROPOSAL_STATS: DashboardStats = {
   total: 0,
@@ -23,12 +57,14 @@ const EMPTY_PROPOSAL_STATS: DashboardStats = {
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [chats, setChats] = useState<ChatRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [proposalStats, setProposalStats] = useState<DashboardStats>(EMPTY_PROPOSAL_STATS);
   const [proposalActivity, setProposalActivity] = useState<ProposalActivity[]>([]);
   const [showFailedModal, setShowFailedModal] = useState(false);
+  const [chartRange, setChartRange] = useState<ChartRange>(30);
 
   const loadData = useCallback(
     () =>
@@ -79,6 +115,11 @@ export default function DashboardPage() {
     },
   ];
 
+  const chartData = useMemo(
+    () => buildDailyCounts(chats.map((c) => c.lead.created_at), chartRange),
+    [chats, chartRange]
+  );
+
   const failedList = [...failedMessages].sort(
     (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
   );
@@ -105,30 +146,62 @@ export default function DashboardPage() {
     };
   });
 
+  const quickActions = [
+    { label: "View leads", desc: "See every inbound chat", href: "/admin/leads", icon: Inbox, color: "var(--indigo)", soft: "var(--indigo-soft)" },
+    { label: "View chats", desc: "Open the chat inbox", href: "/admin/chats", icon: MessageCircle, color: "var(--teal-strong)", soft: "var(--teal-soft)" },
+    { label: "Manage agents", desc: "Add or review agents", href: "/admin/agents", icon: Headset, color: "var(--success)", soft: "var(--success-soft)" },
+    { label: "View proposals", desc: "Check all proposals", href: "/admin/proposals", icon: FileText, color: "var(--orange)", soft: "var(--orange-soft)" },
+  ];
+
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold" style={{ color: "var(--text)" }}>
-        Dashboard
-      </h1>
-      <p className="mb-6 text-sm" style={{ color: "var(--text-muted)" }}>
-        Overview of your WhatsApp CRM activity.
-      </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="border-l-4 pl-3" style={{ borderColor: "var(--indigo)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Welcome back,
+          </p>
+          <h1 className="text-xl font-semibold" style={{ color: "var(--text)" }}>
+            {user?.username ?? "Admin"} 👋
+          </h1>
+          <p className="mt-0.5 text-sm" style={{ color: "var(--text-muted)" }}>
+            Overview of your WhatsApp CRM activity.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowFailedModal(true)}
+          title="Failed messages"
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors hover:opacity-80"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", color: "var(--text-muted)" }}
+        >
+          <Bell size={17} />
+          {failedMessages.length > 0 && (
+            <span
+              className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
+              style={{ background: "var(--danger)" }}
+            >
+              {failedMessages.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
+      <CostSavingNote accent="var(--indigo)" />
 
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {stats.map((s) => (
           <div
             key={s.label}
             onClick={s.onClick}
-            className={`rounded-2xl border p-4 transition-colors ${s.onClick ? "cursor-pointer hover:bg-[var(--surface-2)]" : ""}`}
+            className={`relative overflow-hidden rounded-2xl border p-4 transition-colors ${s.onClick ? "cursor-pointer hover:bg-[var(--surface-2)]" : ""}`}
             style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
           >
             <div
-              className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg"
+              className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
               style={{ background: s.soft, color: s.color }}
             >
-              <s.icon size={18} />
+              <s.icon size={19} />
             </div>
             <p className="text-2xl font-semibold tabular-nums" style={{ color: "var(--text)" }}>
               {show(s.value)}
@@ -138,6 +211,128 @@ export default function DashboardPage() {
             </p>
           </div>
         ))}
+      </div>
+
+      <div
+        className="mb-8 rounded-2xl border p-5"
+        style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-lg"
+            style={{ background: "var(--orange-soft)", color: "var(--orange)" }}
+          >
+            <Zap size={16} />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+              Quick actions
+            </h2>
+            <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+              Get started with your daily tasks
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {quickActions.map((a) => (
+            <Link
+              key={a.label}
+              href={a.href}
+              className="flex items-center gap-2.5 rounded-xl border p-3 transition-colors hover:bg-[var(--surface-2)]"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{ background: a.soft, color: a.color }}
+              >
+                <a.icon size={16} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                  {a.label}
+                </p>
+                <p className="truncate text-xs" style={{ color: "var(--text-faint)" }}>
+                  {a.desc}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+        <div
+          className="rounded-2xl border p-5"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+        >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                New leads over time
+              </h2>
+              <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                How many new contacts came in each day
+              </p>
+            </div>
+            <div className="flex gap-1 rounded-full p-1" style={{ background: "var(--surface-2)" }}>
+              {([7, 30, 90] as ChartRange[]).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setChartRange(r)}
+                  className="rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
+                  style={
+                    chartRange === r
+                      ? { background: "var(--indigo)", color: "white" }
+                      : { color: "var(--text-muted)" }
+                  }
+                >
+                  {r}D
+                </button>
+              ))}
+            </div>
+          </div>
+          <SimpleLineChart data={chartData} color="var(--indigo)" />
+        </div>
+
+        <div
+          className="rounded-2xl border p-5"
+          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+        >
+          <h2 className="mb-4 text-sm font-semibold" style={{ color: "var(--text)" }}>
+            Recent activity
+          </h2>
+          {recentMessages.length === 0 ? (
+            <p className="py-6 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+              No messages yet.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {recentMessages.slice(0, 6).map((m) => {
+                const chat = chatById.get(m.chat);
+                const name = chat?.lead.name || chat?.lead.phone_number || "Unknown";
+                return (
+                  <div key={m.id} className="flex items-start gap-3">
+                    <Avatar name={name} size={28} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium" style={{ color: "var(--text)" }}>
+                        {name}{" "}
+                        <span style={{ color: "var(--text-faint)" }}>
+                          · {m.direction === "in" ? "received" : "sent"}
+                        </span>
+                      </p>
+                      <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
+                        {m.body || "(media)"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[10px]" style={{ color: "var(--text-faint)" }}>
+                      {formatTime(m.sent_at)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -233,77 +428,37 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div
-          className="rounded-2xl border p-5"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
-        >
-          <h2 className="mb-4 text-sm font-semibold" style={{ color: "var(--text)" }}>
-            Agent workload
-          </h2>
-          {workload.length === 0 ? (
-            <p className="py-6 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              No agents yet.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {workload.map((w) => (
-                <div key={w.agent.id} className="flex items-center gap-3">
-                  <Avatar name={w.agent.username} size={30} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
-                      {w.agent.username}
-                    </p>
-                    <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-                      {w.inProgress} active · {w.closed} closed
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-                    {w.total}
+      <div
+        className="mb-8 rounded-2xl border p-5"
+        style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
+      >
+        <h2 className="mb-4 text-sm font-semibold" style={{ color: "var(--text)" }}>
+          Agent workload
+        </h2>
+        {workload.length === 0 ? (
+          <p className="py-6 text-center text-sm" style={{ color: "var(--text-faint)" }}>
+            No agents yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {workload.map((w) => (
+              <div key={w.agent.id} className="flex items-center gap-3">
+                <Avatar name={w.agent.username} size={30} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+                    {w.agent.username}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                    {w.inProgress} active · {w.closed} closed
                   </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div
-          className="rounded-2xl border p-5"
-          style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
-        >
-          <h2 className="mb-4 text-sm font-semibold" style={{ color: "var(--text)" }}>
-            Recent activity
-          </h2>
-          {recentMessages.length === 0 ? (
-            <p className="py-6 text-center text-sm" style={{ color: "var(--text-faint)" }}>
-              No messages yet.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {recentMessages.map((m) => {
-                const chat = chatById.get(m.chat);
-                const name = chat?.lead.name || chat?.lead.phone_number || "Unknown";
-                return (
-                  <div key={m.id} className="flex items-start gap-3">
-                    <Avatar name={name} size={28} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium" style={{ color: "var(--text)" }}>
-                        {name} <span style={{ color: "var(--text-faint)" }}>· {m.direction === "in" ? "received" : "sent"}</span>
-                      </p>
-                      <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
-                        {m.body || "(media)"}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1 text-[11px]" style={{ color: "var(--text-faint)" }}>
-                      {formatTime(m.sent_at)}
-                      {m.direction === "out" && <DeliveryIcon status={m.delivery_status} />}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--text)" }}>
+                  {w.total}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type SubmitEvent } from "react";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
-import { StatusPill } from "@/components/ui/StatusPill";
 import type { ChatRow, ClientStatus, UserRow } from "@/types/admin";
 
 const CLIENT_STATUS_OPTIONS: { value: ClientStatus; label: string }[] = [
@@ -217,7 +216,7 @@ function ChatRowItem({
   const displayName = chat.lead.name || chat.lead.phone_number;
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border p-3"
+      className="flex flex-wrap items-center gap-3 rounded-xl border p-3"
       style={{ background: "var(--surface)", borderColor: "var(--border)", boxShadow: "var(--shadow-sm)" }}
     >
       <Avatar name={displayName} size={38} />
@@ -232,11 +231,10 @@ function ChatRowItem({
           {chat.lead.client_status ? ` · ${CLIENT_STATUS_LABELS[chat.lead.client_status]}` : ""}
         </p>
       </div>
-      <StatusPill status={chat.status} />
       <select
         defaultValue={chat.assigned_user ?? ""}
         onChange={(e) => onAssign(chat.id, e.target.value)}
-        className="rounded-lg border px-2 py-1.5 text-xs outline-none"
+        className="ml-auto shrink-0 rounded-lg border px-2 py-1.5 text-xs outline-none"
         style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
       >
         <option value="">Unassigned</option>

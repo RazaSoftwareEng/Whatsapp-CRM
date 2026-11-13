@@ -16,6 +16,7 @@ import {
 import { api } from "@/lib/api";
 import { formatTime } from "@/lib/format";
 import { usePolledLoad } from "@/lib/usePolledLoad";
+import { CostSavingNote } from "@/components/ui/CostSavingNote";
 import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import type { ChatStats, DashboardStats, ProposalActivity } from "@/types/companies";
 
@@ -109,6 +110,8 @@ export default function ManagerDashboardPage() {
       </p>
 
       {loadState === "error" && <LoadErrorBanner onRetry={retry} />}
+
+      <CostSavingNote accent="var(--orange)" />
 
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((s) => (
