@@ -30,15 +30,23 @@ def guess_media_extension(mime_type: str) -> str:
 
 def transcode_webm_to_ogg(raw_bytes: bytes) -> bytes:
     """Browsers record voice notes as audio/webm (Opus codec) via MediaRecorder,
-    but WhatsApp's Cloud API only accepts Opus audio inside an Ogg container —
-    remux (not re-encode, the codec is already Opus) with ffmpeg."""
+    but WhatsApp's Cloud API only reliably plays Opus-in-Ogg that is mono —
+    a browser mic capture can come through stereo (or at an odd sample rate),
+    which some WhatsApp clients fail to decode at all ("corrupt" file on the
+    recipient's end) even though it looks fine on our own end. Force mono/16kHz
+    and a speech-tuned encode, don't just remux the original stream as-is."""
     with tempfile.TemporaryDirectory() as tmp:
         src_path = os.path.join(tmp, "in.webm")
         dst_path = os.path.join(tmp, "out.ogg")
         with open(src_path, "wb") as f:
             f.write(raw_bytes)
         subprocess.run(
-            ["ffmpeg", "-y", "-i", src_path, "-c:a", "libopus", "-vn", dst_path],
+            [
+                "ffmpeg", "-y", "-i", src_path,
+                "-ac", "1", "-ar", "16000",
+                "-c:a", "libopus", "-b:a", "32k", "-vbr", "on", "-application", "voip",
+                "-vn", dst_path,
+            ],
             check=True, capture_output=True, timeout=30,
         )
         with open(dst_path, "rb") as f:

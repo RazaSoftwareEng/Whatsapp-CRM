@@ -9,7 +9,7 @@ import { formatDate, isSameDay } from "@/lib/format";
 import { usePolledLoad } from "@/lib/usePolledLoad";
 import { LoadErrorBanner, StatSkeleton } from "@/components/ui/LoadErrorBanner";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { DashboardStats, ProposalRow, ProposalStatus } from "@/types/companies";
+import type { ProposalRow, ProposalStatus } from "@/types/companies";
 
 const STATUS_OPTIONS: { value: ProposalStatus | ""; label: string }[] = [
   { value: "", label: "All statuses" },
@@ -44,15 +44,6 @@ function isWithinRange(iso: string, range: DateRange): boolean {
   return date.getFullYear() === now.getFullYear(); // year
 }
 
-const EMPTY_STATS: DashboardStats = {
-  total: 0,
-  pending_review: 0,
-  approved: 0,
-  rejected: 0,
-  changes_requested: 0,
-  today: 0,
-};
-
 export default function ManagerProposalsPage() {
   return (
     <Suspense fallback={null}>
@@ -64,36 +55,42 @@ export default function ManagerProposalsPage() {
 function ManagerProposalsPageInner() {
   const searchParams = useSearchParams();
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
-  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<ProposalStatus | "">("");
   const [dateRange, setDateRange] = useState<DateRange>("all");
 
   const loadProposals = useCallback(
-    () =>
-      Promise.all([
-        api.get<ProposalRow[]>("/proposals/").then((res) => setProposals(res.data)),
-        api.get<DashboardStats>("/proposals/dashboard/").then((res) => setStats(res.data)),
-      ]),
+    () => api.get<ProposalRow[]>("/proposals/").then((res) => setProposals(res.data)),
     []
   );
 
   const { state: loadState, retry } = usePolledLoad(loadProposals);
   const show = (value: number) => (loadState === "loading" ? <StatSkeleton /> : loadState === "error" ? "—" : value);
 
+  // Cards reflect the selected date range (so switching Daily/Weekly/Monthly/
+  // Yearly updates the numbers), independent of the search box and status
+  // dropdown below, which only narrow the table.
+  const inRange = useMemo(() => proposals.filter((p) => isWithinRange(p.created_at, dateRange)), [proposals, dateRange]);
+
   const cards = [
-    { label: "Total proposals", value: stats.total, icon: FileText, color: "var(--indigo)", soft: "var(--indigo-soft)" },
+    { label: "Total proposals", value: inRange.length, icon: FileText, color: "var(--indigo)", soft: "var(--indigo-soft)" },
     {
       label: "Approved",
-      value: stats.approved,
+      value: inRange.filter((p) => p.status === "approved").length,
       icon: CheckCircle2,
       color: "var(--success)",
       soft: "var(--success-soft)",
     },
-    { label: "Pending review", value: stats.pending_review, icon: Clock, color: "var(--warning)", soft: "var(--warning-soft)" },
+    {
+      label: "Pending review",
+      value: inRange.filter((p) => p.status === "pending_review").length,
+      icon: Clock,
+      color: "var(--warning)",
+      soft: "var(--warning-soft)",
+    },
     {
       label: "Today's proposals",
-      value: stats.today,
+      value: inRange.filter((p) => isSameDay(new Date(p.created_at), new Date())).length,
       icon: CalendarDays,
       color: "var(--teal-strong)",
       soft: "var(--teal-soft)",
@@ -101,14 +98,13 @@ function ManagerProposalsPageInner() {
   ];
 
   const filtered = useMemo(() => {
-    return proposals.filter((p) => {
+    return inRange.filter((p) => {
       if (statusFilter && p.status !== statusFilter) return false;
-      if (!isWithinRange(p.created_at, dateRange)) return false;
       if (!search.trim()) return true;
       const q = search.trim().toLowerCase();
       return p.title.toLowerCase().includes(q) || p.company.company_name.toLowerCase().includes(q);
     });
-  }, [proposals, statusFilter, dateRange, search]);
+  }, [inRange, statusFilter, search]);
 
   return (
     <div>
